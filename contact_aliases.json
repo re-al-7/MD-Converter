@@ -1,0 +1,22 @@
+{
+  "_comment": "Reglas de alias para campos de correo (de, para, cc).",
+  "_format": "Cada entrada tiene 'match' (lista de fragmentos a buscar, case-insensitive) y 'alias' (valor de reemplazo).",
+  "aliases": [
+    {
+      "alias": "\"[[Clara Cabrera]]\"",
+      "match": ["Clara Cabrera", "Clara.Cabrera"]
+    },
+    {
+      "alias": "\"[[Alonzo Vera]]\"",
+      "match": ["Alonzo Vera", "Alonzo.Vera", "alvera"]
+    },
+    {
+      "alias": "\"[[José Revollo]]\"",
+      "match": ["José Revollo", "Jose Revollo", "José.Revollo", "Jose.Revollo"]
+    },
+    {
+      "alias": "\"[[Liuba Sarmiento]]\"",
+      "match": ["Liuba Sarmiento", "Liuba.Sarmiento"]
+    }
+  ]
+}
