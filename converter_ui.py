@@ -178,14 +178,17 @@ HTML = r"""<!DOCTYPE html>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
   :root {
-    --bg:      #0b0d11;
-    --surface: #13161d;
-    --border:  #1f2330;
-    --accent:  #00e5a0;
-    --accent2: #0066ff;
-    --warn:    #ff4d6d;
-    --text:    #e2e8f0;
-    --muted:   #4a5568;
+    --bg:      #282a36;
+    --surface: #21222c;
+    --border:  #44475a;
+    --accent:  #bd93f9;
+    --accent2: #8be9fd;
+    --warn:    #ff5555;
+    --text:    #f8f8f2;
+    --muted:   #6272a4;
+    --green:   #50fa7b;
+    --pink:    #ff79c6;
+    --orange:  #ffb86c;
     --mono:    'DM Mono', monospace;
     --display: 'Syne', sans-serif;
   }
@@ -274,18 +277,18 @@ HTML = r"""<!DOCTYPE html>
     content: '';
     position: absolute; inset: 0;
     border-radius: 6px;
-    background: radial-gradient(ellipse at 50% 0%, rgba(0,229,160,0.04) 0%, transparent 70%);
+    background: radial-gradient(ellipse at 50% 0%, rgba(189,147,249,0.04) 0%, transparent 70%);
     pointer-events: none;
   }
 
   .dropzone.drag-over {
     border-color: var(--accent);
-    background: rgba(0,229,160,0.05);
+    background: rgba(189,147,249,0.05);
     transform: scale(1.005);
   }
 
   .dropzone.drag-over::before {
-    background: radial-gradient(ellipse at 50% 0%, rgba(0,229,160,0.12) 0%, transparent 70%);
+    background: radial-gradient(ellipse at 50% 0%, rgba(189,147,249,0.12) 0%, transparent 70%);
   }
 
   .drop-icon {
@@ -329,12 +332,12 @@ HTML = r"""<!DOCTYPE html>
     letter-spacing: 0.05em;
   }
 
-  .ft-docx { background: rgba(0,102,255,0.15); color: #4d9fff; border: 1px solid rgba(0,102,255,0.25); }
-  .ft-pdf  { background: rgba(255,77,109,0.15); color: #ff6b8a; border: 1px solid rgba(255,77,109,0.25); }
-  .ft-xlsx { background: rgba(0,229,160,0.12); color: var(--accent); border: 1px solid rgba(0,229,160,0.2); }
-  .ft-html { background: rgba(255,165,0,0.12); color: #ffb347; border: 1px solid rgba(255,165,0,0.2); }
-  .ft-eml  { background: rgba(160,100,255,0.15); color: #c084fc; border: 1px solid rgba(160,100,255,0.25); }
-  .ft-csv  { background: rgba(100,200,255,0.12); color: #67e3ff; border: 1px solid rgba(100,200,255,0.2); }
+  .ft-docx { background: rgba(139,233,253,0.12); color: var(--accent2); border: 1px solid rgba(139,233,253,0.25); }
+  .ft-pdf  { background: rgba(255,85,85,0.15);   color: var(--warn);    border: 1px solid rgba(255,85,85,0.25); }
+  .ft-xlsx { background: rgba(80,250,123,0.12);  color: var(--green);   border: 1px solid rgba(80,250,123,0.2); }
+  .ft-html { background: rgba(255,184,108,0.12); color: var(--orange);  border: 1px solid rgba(255,184,108,0.2); }
+  .ft-eml  { background: rgba(255,121,198,0.12); color: var(--pink);    border: 1px solid rgba(255,121,198,0.25); }
+  .ft-csv  { background: rgba(189,147,249,0.12); color: var(--accent);  border: 1px solid rgba(189,147,249,0.2); }
 
   #file-input { display: none; }
 
@@ -406,8 +409,8 @@ HTML = r"""<!DOCTYPE html>
   .result-meta.err-msg { color: var(--warn); }
 
   .btn-dl {
-    background: rgba(0,229,160,0.1);
-    border: 1px solid rgba(0,229,160,0.25);
+    background: rgba(189,147,249,0.1);
+    border: 1px solid rgba(189,147,249,0.25);
     color: var(--accent);
     padding: 5px 12px;
     border-radius: 4px;
@@ -420,7 +423,7 @@ HTML = r"""<!DOCTYPE html>
     transition: all 0.15s;
     white-space: nowrap;
   }
-  .btn-dl:hover { background: rgba(0,229,160,0.2); border-color: var(--accent); }
+  .btn-dl:hover { background: rgba(189,147,249,0.2); border-color: var(--accent); }
 
   .btn-copy {
     background: rgba(255,255,255,0.04);
@@ -437,7 +440,7 @@ HTML = r"""<!DOCTYPE html>
     white-space: nowrap;
   }
   .btn-copy:hover { background: rgba(255,255,255,0.08); color: var(--text); border-color: var(--muted); }
-  .btn-copy.copied { background: rgba(0,229,160,0.1); border-color: rgba(0,229,160,0.25); color: var(--accent); }
+  .btn-copy.copied { background: rgba(189,147,249,0.1); border-color: rgba(189,147,249,0.25); color: var(--accent); }
 
   /* Spinner */
   .spinner {
@@ -487,7 +490,7 @@ HTML = r"""<!DOCTYPE html>
     margin-bottom: 12px;
   }
 
-  .watch-desc strong { color: #c084fc; }
+  .watch-desc strong { color: var(--accent); }
 
   .input-row {
     display: flex;
@@ -512,7 +515,7 @@ HTML = r"""<!DOCTYPE html>
 
   .btn-primary {
     background: var(--accent);
-    color: #000;
+    color: var(--bg);
     border: none;
     padding: 7px 14px;
     border-radius: 4px;
@@ -550,15 +553,15 @@ HTML = r"""<!DOCTYPE html>
 
   .watch-status.active {
     display: block;
-    background: rgba(0,229,160,0.1);
-    border: 1px solid rgba(0,229,160,0.2);
+    background: rgba(189,147,249,0.1);
+    border: 1px solid rgba(189,147,249,0.2);
     color: var(--accent);
   }
 
   .watch-status.inactive {
     display: block;
-    background: rgba(255,77,109,0.1);
-    border: 1px solid rgba(255,77,109,0.2);
+    background: rgba(255,85,85,0.1);
+    border: 1px solid rgba(255,85,85,0.2);
     color: var(--warn);
   }
 
@@ -798,12 +801,12 @@ HTML = r"""<!DOCTYPE html>
   .preview-content ul, .preview-content ol { padding-left: 20px; margin: 0 0 12px; }
   .preview-content li { margin-bottom: 4px; }
   .preview-content blockquote { border-left: 3px solid var(--border); padding-left: 12px; color: var(--muted); margin: 0 0 12px; }
-  .preview-content code { background: var(--bg); padding: 2px 5px; border-radius: 3px; font-size: 11px; color: #c084fc; }
+  .preview-content code { background: var(--bg); padding: 2px 5px; border-radius: 3px; font-size: 11px; color: var(--pink); }
   .preview-content pre { background: var(--bg); padding: 12px 14px; border-radius: 6px; overflow-x: auto; margin: 12px 0; }
   .preview-content pre code { color: var(--text); padding: 0; background: none; }
   .preview-content table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 12px; }
   .preview-content th, .preview-content td { border: 1px solid var(--border); padding: 7px 12px; text-align: left; }
-  .preview-content th { background: rgba(0,229,160,0.07); color: var(--accent); font-weight: 500; }
+  .preview-content th { background: rgba(189,147,249,0.07); color: var(--accent); font-weight: 500; }
   .preview-content tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
 </style>
 </head>
