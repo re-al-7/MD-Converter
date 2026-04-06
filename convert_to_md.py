@@ -437,10 +437,10 @@ def _split_thread(body: str) -> list[dict]:
         # "--- Original Message ---" / "--- Mensaje original ---"
         re.compile(r'\n[ \t]*-{3,}[ \t]*(?:Original Message|Mensaje original)[ \t]*-{3,}[ \t]*\n', re.IGNORECASE),
         # Bloque De:/From: standalone (sin ________________________________ previo).
-        # Lookahead: el match es solo \n, dejando "De:" al inicio del siguiente chunk
-        # para que _skip_outlook_headers pueda extraer la metadata completa.
+        # Acepta tanto 'From: Nombre <email>' como 'From: Nombre' (sin email en la línea).
+        # Lookahead: deja 'De:' al inicio del siguiente chunk para _skip_outlook_headers.
         re.compile(
-            r'\n(?=(?:De|From)\s*:\s*[^\n<>]*<[^\n>]+@[^\n>]+>[^\n]*\n'
+            r'\n(?=(?:De|From)\s*:[^\n]{1,120}\n'
             r'(?:Enviado(?:\s+el)?|Sent)\s*:)',
             re.IGNORECASE
         ),
@@ -655,7 +655,7 @@ def _build_md(subject: str, sender: str, to: str, cc: str,
 
     # Asunto limpio para frontmatter: eliminar caracteres especiales
     import re as _re
-    subject_clean = _re.sub(r'[<>:";/\\|?*\x00-\x1f]', ' ', subject)
+    subject_clean = _re.sub(r'[<>:";/\\|?*\x00-\x1f\[\]]', ' ', subject)
     subject_clean = _re.sub(r'[,;]+', ' ', subject_clean)
     subject_clean = _re.sub(r' {2,}', ' ', subject_clean).strip()
 
@@ -761,7 +761,8 @@ def convert_eml(path: Path) -> list[tuple[str, str]]:
 
     total = len(segments)
     results = []
-    for i, seg in enumerate(segments, start=1):
+    # Invertir: el más antiguo (último en la lista) recibe número 1
+    for i, seg in enumerate(reversed(segments), start=1):
         seg_date    = seg.get("date")
         seg_sender  = seg.get("sender")  or sender
         seg_to      = seg.get("to")      or to
@@ -772,9 +773,10 @@ def convert_eml(path: Path) -> list[tuple[str, str]]:
         seg_stem    = _seg_stem(seg_date, date_raw, seg_slug)
         filename    = f"{seg_stem} — msg{i:02d} de {total}.md"
         seg_date_arg = seg_date if seg_date else date_raw
+        # El mensaje más antiguo es el último segmento (i == total tras invertir)
         content  = _build_md(
             seg_subject, seg_sender, seg_to, seg_cc, seg_date_arg,
-            seg["body"], attachments if i == 1 else [],
+            seg["body"], attachments if i == total else [],
             index=i, total=total
         )
         results.append((filename, content))
@@ -829,7 +831,8 @@ def convert_msg(path: Path) -> list[tuple[str, str]]:
 
     total = len(segments)
     results = []
-    for i, seg in enumerate(segments, start=1):
+    # Invertir: el más antiguo (último en la lista) recibe número 1
+    for i, seg in enumerate(reversed(segments), start=1):
         seg_date    = seg.get("date")
         seg_sender  = seg.get("sender")  or sender
         seg_to      = seg.get("to")      or to
@@ -840,9 +843,10 @@ def convert_msg(path: Path) -> list[tuple[str, str]]:
         seg_stem    = _seg_stem(seg_date, date_raw, seg_slug)
         filename    = f"{seg_stem} — msg{i:02d} de {total}.md"
         seg_date_arg = seg_date if seg_date else date_raw
+        # El mensaje más antiguo es el último segmento (i == total tras invertir)
         content  = _build_md(
             seg_subject, seg_sender, seg_to, seg_cc, seg_date_arg,
-            seg["body"], att_names if i == 1 else [],
+            seg["body"], att_names if i == total else [],
             index=i, total=total
         )
         results.append((filename, content))
