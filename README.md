@@ -8,10 +8,21 @@ Conversor universal de archivos a Markdown, con UI web local y soporte especiali
 
 ```
 mdconverter/
-├── convert_to_md.py       # Motor de conversión (CLI + librería)
-├── converter_ui.py        # Servidor web local con UI drag & drop
-├── contact_aliases.json   # Reglas de alias para contactos conocidos
-└── md_output/             # Carpeta de salida (se crea automáticamente)
+├── convert_to_md.py           # CLI + dispatcher (re-exporta converters/)
+├── converter_ui.py            # Servidor Flask con UI drag & drop (localhost:5000)
+├── contact_aliases.json       # Reglas de alias para contactos conocidos
+├── converters/                # Lógica de conversión por formato
+│   ├── docx.py                #   .docx → Markdown (mammoth)
+│   ├── pdf.py                 #   .pdf  → Markdown (pdfplumber)
+│   ├── html.py                #   HTML/URL → Markdown + soporte de tablas HTML
+│   ├── tabular.py             #   .xlsx / .csv → tabla Markdown (pandas)
+│   └── email/
+│       ├── thread.py          #   Detección y separación de hilos
+│       ├── builders.py        #   Construcción de frontmatter YAML y alias
+│       ├── eml.py             #   Conversor .eml
+│       └── msg.py             #   Conversor .msg (Outlook)
+├── md_output/                 # Salida de archivos .md (se crea automáticamente)
+└── correos/                   # Carpeta vigilada por defecto para .msg de Outlook
 ```
 
 ---
@@ -99,11 +110,15 @@ Cuando el correo contiene una conversación de ida y vuelta, **se genera un arch
 
 Cada archivo tiene la **fecha real** del mensaje correspondiente (no la del correo más reciente), y los metadatos (`de`, `para`, `cc`, `asunto`) son los del mensaje específico cuando están disponibles.
 
-El separador de hilo se detecta automáticamente en tres formatos:
+El separador de hilo se detecta automáticamente en cinco formatos:
 
 - `On [fecha] [nombre] wrote:` — estilo Gmail / Outlook Web
 - `________________________________` seguido de bloque `De:/Enviado:` — estilo Outlook Desktop
 - Bloque `De:/From:` standalone (sin separador previo) — formato mixto
+- `**From:**` / `**Sent:**` en negritas — generado por html2text desde el HTML del correo
+- `--- Original Message ---` — clientes de correo alternativos
+
+Las tablas HTML presentes en el cuerpo del correo se convierten a tablas Markdown.
 
 ### Frontmatter YAML
 
