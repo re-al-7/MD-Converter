@@ -5,6 +5,9 @@ CLAUDE.md
 md_output/
 correos/
 
+# Archivos de prueba
+tests/
+
 # Datos personales
 contact_aliases.json
 
