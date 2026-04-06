@@ -20,7 +20,7 @@ from flask import Flask, request, jsonify, send_file, render_template_string
 SCRIPT_DIR = Path(__file__).parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from convert_to_md import convert_docx, convert_pdf, convert_html, convert_xlsx, convert_csv, convert_eml, convert_msg
+from convert_to_md import convert_docx, convert_pdf, convert_html, convert_xlsx, convert_csv, convert_pptx, convert_eml, convert_msg
 
 app = Flask(__name__)
 OUTPUT_DIR = SCRIPT_DIR / "md_output"
@@ -63,7 +63,7 @@ def _start_watcher(folder_path: str) -> bool:
 
 # ─── Conversión ───────────────────────────────────────────────────────────────
 
-SUPPORTED = {".docx", ".pdf", ".html", ".htm", ".xlsx", ".csv", ".eml", ".msg"}
+SUPPORTED = {".docx", ".pdf", ".pptx", ".html", ".htm", ".xlsx", ".csv", ".eml", ".msg"}
 
 def do_convert(src: Path, out_dir: Path) -> list[dict]:
     ext = src.suffix.lower()
@@ -77,11 +77,12 @@ def do_convert(src: Path, out_dir: Path) -> list[dict]:
                 dest.write_text(content, encoding="utf-8")
                 results.append({"name": fname, "path": str(dest), "ok": True})
         else:
-            if ext == ".docx":   content = convert_docx(src)
-            elif ext == ".pdf":  content = convert_pdf(src)
+            if ext == ".docx":        content = convert_docx(src)
+            elif ext == ".pptx":      content = convert_pptx(src)
+            elif ext == ".pdf":       content = convert_pdf(src)
             elif ext in (".html", ".htm"): content = convert_html(str(src))
-            elif ext == ".xlsx": content = convert_xlsx(src)
-            elif ext == ".csv":  content = convert_csv(src)
+            elif ext == ".xlsx":      content = convert_xlsx(src)
+            elif ext == ".csv":       content = convert_csv(src)
             else:
                 return [{"name": src.name, "ok": False, "error": f"Formato no soportado: {ext}"}]
             dest = out_dir / f"{src.stem}.md"
@@ -934,11 +935,30 @@ def index():
 
 # ─── Arranque ─────────────────────────────────────────────────────────────────
 
+def _clear_folder(folder: Path) -> int:
+    """Elimina todos los archivos de una carpeta. Retorna el número de archivos eliminados."""
+    count = 0
+    if folder.exists():
+        for f in folder.iterdir():
+            if f.is_file():
+                f.unlink()
+                count += 1
+    return count
+
+
 if __name__ == "__main__":
     print("\n  MD Converter UI")
     print(f"  → http://localhost:5000")
     print(f"  → Archivos convertidos en: {OUTPUT_DIR}")
     print("  → Ctrl+C para detener\n")
+
+    # Limpiar carpetas al arrancar
+    correos_dir = Path(DEFAULT_WATCH_DIR)
+    n_correos   = _clear_folder(correos_dir)
+    n_output    = _clear_folder(OUTPUT_DIR)
+    if n_correos or n_output:
+        print(f"  🗑  Limpieza inicial: {n_correos} correo(s), {n_output} md(s) eliminados")
+
     # Auto-iniciar escucha en carpeta por defecto
     if _start_watcher(DEFAULT_WATCH_DIR):
         print(f"  👁  Escuchando: {DEFAULT_WATCH_DIR}")

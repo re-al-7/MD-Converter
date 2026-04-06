@@ -7,7 +7,7 @@ from pathlib import Path
 
 from ..html import _html_to_md_with_tables
 from .thread import _split_thread
-from .builders import _build_md, _seg_stem
+from .builders import _build_md, _seg_stem, _decode_bytes
 
 
 def convert_msg(path: Path) -> list[tuple[str, str]]:
@@ -48,9 +48,9 @@ def convert_msg(path: Path) -> list[tuple[str, str]]:
     subject_slug = re.sub(r'\s+', ' ', subject_slug).strip()[:80]
     base_stem    = f"{fecha_stem} — {subject_slug}"
 
-    # Decodificar y convertir HTML body una sola vez
+    # Decodificar y convertir HTML body una sola vez (con fallback de encoding)
     if html_body_raw and isinstance(html_body_raw, bytes):
-        html_body_raw = html_body_raw.decode('utf-8', errors='replace')
+        html_body_raw = _decode_bytes(html_body_raw)
     html_md = _html_to_md_with_tables(html_body_raw) if html_body_raw else None
 
     # Dividir hilo desde texto plano (separadores Outlook viven ahí)

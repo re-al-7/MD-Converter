@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
 convert_to_md.py — Conversor universal a Markdown
-Soporta: .docx, .pdf, .html, .htm, .xlsx, .csv, .eml, .msg, URLs web
+Soporta: .docx, .pdf, .pptx, .html, .htm, .xlsx, .csv, .eml, .msg, URLs web
 
 Uso:
     python convert_to_md.py archivo.docx
+    python convert_to_md.py presentacion.pptx
     python convert_to_md.py reporte.pdf
     python convert_to_md.py datos.xlsx
     python convert_to_md.py pagina.html
@@ -24,11 +25,12 @@ from converters import (
     convert_html,
     convert_xlsx,
     convert_csv,
+    convert_pptx,
     convert_eml,
     convert_msg,
 )
 
-SUPPORTED_EXTENSIONS = {".docx", ".pdf", ".html", ".htm", ".xlsx", ".csv", ".eml", ".msg"}
+SUPPORTED_EXTENSIONS = {".docx", ".pdf", ".pptx", ".html", ".htm", ".xlsx", ".csv", ".eml", ".msg"}
 
 
 def install_deps():
@@ -37,6 +39,7 @@ def install_deps():
     deps = [
         "mammoth",        # docx → md
         "pdfplumber",     # pdf → texto
+        "python-pptx",    # pptx → md
         "html2text",      # html → md
         "pandas",         # xlsx/csv → md
         "openpyxl",       # motor Excel para pandas
@@ -79,6 +82,8 @@ def convert_file(source: str, output_dir: Path = None) -> Path | None:
             content = convert_html(source, is_url=is_url)
         elif ext == ".docx":
             content = convert_docx(Path(source))
+        elif ext == ".pptx":
+            content = convert_pptx(Path(source))
         elif ext == ".pdf":
             content = convert_pdf(Path(source))
         elif ext == ".xlsx":

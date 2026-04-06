@@ -46,6 +46,11 @@ def _html_to_md_with_tables(html: str) -> str:
     from bs4 import BeautifulSoup
 
     soup = BeautifulSoup(html, 'html.parser')
+
+    # Eliminar imágenes embebidas (cid:) — no tienen sentido fuera del cliente de correo
+    for img in soup.find_all('img', src=lambda s: s and s.lower().startswith('cid:')):
+        img.decompose()
+
     tables_md: dict[str, str] = {}
 
     for i, table in enumerate(soup.find_all('table')):
