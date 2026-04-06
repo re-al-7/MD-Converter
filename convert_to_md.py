@@ -154,10 +154,82 @@ def _decode_str(value: str) -> str:
     return " ".join(decoded)
 
 
-def _extract_body(msg) -> str:
-    """Extrae el cuerpo de un mensaje email como texto plano."""
-    import html2text
+def _html_table_to_md(table) -> str:
+    """
+    Convierte un elemento BeautifulSoup <table> a tabla Markdown.
+    Solo procesa filas directas (no tablas anidadas).
+    """
+    import re
 
+    rows_data = []
+    # Buscar filas en thead/tbody/tfoot directos, y también <tr> directos del table
+    containers = [table] + table.find_all(['thead', 'tbody', 'tfoot'], recursive=False)
+    for container in containers:
+        for tr in container.find_all('tr', recursive=False):
+            cells = []
+            for cell in tr.find_all(['th', 'td'], recursive=False):
+                text = cell.get_text(separator=' ', strip=True)
+                # Escapar | y colapsar espacios internos
+                text = text.replace('|', '\\|')
+                text = re.sub(r'\s+', ' ', text).strip()
+                cells.append(text)
+            if cells:
+                rows_data.append(cells)
+
+    if not rows_data:
+        return ''
+
+    ncols = max(len(r) for r in rows_data)
+    padded = [r + [''] * (ncols - len(r)) for r in rows_data]
+
+    header = padded[0]
+    lines = [
+        '| ' + ' | '.join(header) + ' |',
+        '| ' + ' | '.join('---' for _ in header) + ' |',
+    ]
+    for row in padded[1:]:
+        lines.append('| ' + ' | '.join(row) + ' |')
+
+    return '\n'.join(lines)
+
+
+def _html_to_md_with_tables(html: str) -> str:
+    """
+    Convierte HTML a Markdown convirtiendo las tablas HTML en tablas Markdown
+    reales antes de pasar el resto a html2text.
+    """
+    import html2text
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(html, 'html.parser')
+    tables_md: dict[str, str] = {}
+
+    for i, table in enumerate(soup.find_all('table')):
+        md = _html_table_to_md(table)
+        if md:
+            placeholder = f'___TABLE_{i}___'
+            tables_md[placeholder] = md
+            new_tag = soup.new_tag('div')
+            new_tag.string = f'\n{placeholder}\n'
+            table.replace_with(new_tag)
+        # Si la tabla está vacía, html2text la maneja (o la ignora)
+
+    converter = html2text.HTML2Text()
+    converter.ignore_links = False
+    converter.body_width   = 0
+    converter.unicode_snob = True
+    converter.bypass_tables = True   # no intentar convertir tablas restantes
+
+    result = converter.handle(str(soup))
+
+    for placeholder, md in tables_md.items():
+        result = result.replace(placeholder, f'\n{md}\n')
+
+    return result.strip()
+
+
+def _extract_body(msg) -> str:
+    """Extrae el cuerpo de un mensaje email como texto plano/markdown."""
     body_text = []
     body_html = []
 
@@ -179,11 +251,7 @@ def _extract_body(msg) -> str:
     if body_text:
         return "\n\n".join(body_text).strip()
     elif body_html:
-        converter = html2text.HTML2Text()
-        converter.ignore_links = False
-        converter.body_width   = 0
-        converter.unicode_snob = True
-        return converter.handle("\n".join(body_html)).strip()
+        return _html_to_md_with_tables("\n".join(body_html))
     return ""
 
 
@@ -279,15 +347,14 @@ def _skip_outlook_headers(text: str) -> tuple:
         return text, empty_meta
 
     lines = text.split('\n')
-    HEADER_RE = re.compile(
-        r'^\s*(?:De|From|Enviado(?:\s+el)?|Sent|Para|To\b|Cc|Asunto|Subject)\s*:',
-        re.IGNORECASE
-    )
-    DE_RE      = re.compile(r'^\s*(?:De|From)\s*:\s*', re.IGNORECASE)
-    ENVIADO_RE = re.compile(r'^\s*(?:Enviado(?:\s+el)?|Sent)\s*:\s*', re.IGNORECASE)
-    PARA_RE    = re.compile(r'^\s*(?:Para|To)\s*:\s*', re.IGNORECASE)
-    CC_RE      = re.compile(r'^\s*Cc\s*:\s*', re.IGNORECASE)
-    ASUNTO_RE  = re.compile(r'^\s*(?:Asunto|Subject)\s*:\s*', re.IGNORECASE)
+    # Acepta tanto "De:" (texto plano) como "**De:**" (html2text con negritas)
+    _F = r'(?:\*\*)?(?:De|From|Enviado(?:\s+el)?|Sent|Para|To\b|Cc|Asunto|Subject)(?::\*\*|\s*:)'
+    HEADER_RE  = re.compile(r'^\s*' + _F, re.IGNORECASE)
+    DE_RE      = re.compile(r'^\s*(?:\*\*)?(?:De|From)(?::\*\*|\s*:)\s*', re.IGNORECASE)
+    ENVIADO_RE = re.compile(r'^\s*(?:\*\*)?(?:Enviado(?:\s+el)?|Sent)(?::\*\*|\s*:)\s*', re.IGNORECASE)
+    PARA_RE    = re.compile(r'^\s*(?:\*\*)?(?:Para|To)(?::\*\*|\s*:)\s*', re.IGNORECASE)
+    CC_RE      = re.compile(r'^\s*(?:\*\*)?Cc(?::\*\*|\s*:)\s*', re.IGNORECASE)
+    ASUNTO_RE  = re.compile(r'^\s*(?:\*\*)?(?:Asunto|Subject)(?::\*\*|\s*:)\s*', re.IGNORECASE)
 
     first = next((l for l in lines if l.strip()), '')
     if not HEADER_RE.match(first.strip()):
@@ -442,6 +509,13 @@ def _split_thread(body: str) -> list[dict]:
         re.compile(
             r'\n(?=(?:De|From)\s*:[^\n]{1,120}\n'
             r'(?:Enviado(?:\s+el)?|Sent)\s*:)',
+            re.IGNORECASE
+        ),
+        # Variante html2text: "**From:**" / "**De:**" + "**Sent:**" / "**Enviado:**"
+        # html2text convierte los encabezados Outlook en negritas Markdown
+        re.compile(
+            r'\n(?=[ \t]*\*\*(?:De|From):\*\*[^\n]{0,200}\n'
+            r'[ \t]*\*\*(?:Enviado(?:\s+el)?|Sent):\*\*)',
             re.IGNORECASE
         ),
     ]
@@ -800,7 +874,9 @@ def convert_msg(path: Path) -> list[tuple[str, str]]:
         to       = (msg.to or "").strip()
         cc       = (msg.cc or "").strip()
         date_obj = msg.date          # datetime object or None
-        body     = (msg.body or "").strip()
+
+        plain_body = (msg.body or "").strip()
+        html_body_raw = getattr(msg, 'htmlBody', None)
 
         # Adjuntos
         att_names = []
@@ -822,17 +898,36 @@ def convert_msg(path: Path) -> list[tuple[str, str]]:
     subject_slug = re.sub(r'\s+', ' ', subject_slug).strip()[:80]
     base_stem = f"{fecha_stem} — {subject_slug}"
 
-    # Intentar dividir hilo
-    segments = _split_thread(body)
+    # Decodificar HTML body una sola vez
+    if html_body_raw and isinstance(html_body_raw, bytes):
+        html_body_raw = html_body_raw.decode('utf-8', errors='replace')
+
+    # Convertir HTML a Markdown con soporte de tablas (si disponible)
+    html_md = _html_to_md_with_tables(html_body_raw) if html_body_raw else None
+
+    # Dividir hilo desde texto plano (los separadores Outlook viven ahí)
+    segments = _split_thread(plain_body)
 
     if not segments:
+        # Mensaje único: HTML con tablas si disponible, si no texto plano
+        body = html_md if html_md else plain_body
         content = _build_md(subject, sender, to, cc, date_raw, body, att_names)
         return [(f"{base_stem}.md", content)]
 
+    # Hilo: intentar dividir también el HTML para obtener cuerpos con tablas
+    # La metadata (fecha, remitente, etc.) siempre viene del split de texto plano
+    html_bodies = None
+    if html_md:
+        html_segments = _split_thread(html_md)
+        if len(html_segments) == len(segments):
+            html_bodies = [seg["body"] for seg in html_segments]
+
     total = len(segments)
     results = []
-    # Invertir: el más antiguo (último en la lista) recibe número 1
-    for i, seg in enumerate(reversed(segments), start=1):
+    reversed_segs = list(reversed(segments))
+    reversed_html = list(reversed(html_bodies)) if html_bodies else [None] * total
+
+    for i, (seg, html_body_seg) in enumerate(zip(reversed_segs, reversed_html), start=1):
         seg_date    = seg.get("date")
         seg_sender  = seg.get("sender")  or sender
         seg_to      = seg.get("to")      or to
@@ -843,10 +938,11 @@ def convert_msg(path: Path) -> list[tuple[str, str]]:
         seg_stem    = _seg_stem(seg_date, date_raw, seg_slug)
         filename    = f"{seg_stem} — msg{i:02d} de {total}.md"
         seg_date_arg = seg_date if seg_date else date_raw
+        seg_body = html_body_seg if html_body_seg else seg["body"]
         # El mensaje más antiguo es el último segmento (i == total tras invertir)
         content  = _build_md(
             seg_subject, seg_sender, seg_to, seg_cc, seg_date_arg,
-            seg["body"], att_names if i == total else [],
+            seg_body, att_names if i == total else [],
             index=i, total=total
         )
         results.append((filename, content))
