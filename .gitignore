@@ -5,6 +5,9 @@ CLAUDE.md
 md_output/
 correos/
 
+# Datos personales
+contact_aliases.json
+
 # Python
 __pycache__/
 *.py[cod]
