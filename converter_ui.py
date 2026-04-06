@@ -117,6 +117,14 @@ def convert():
     return jsonify(all_results)
 
 
+@app.route("/preview/<path:filename>")
+def preview(filename):
+    fp = OUTPUT_DIR / filename
+    if not fp.exists():
+        return jsonify({"error": "Archivo no encontrado"}), 404
+    return jsonify({"content": fp.read_text(encoding="utf-8")})
+
+
 @app.route("/download/<path:filename>")
 def download(filename):
     fp = OUTPUT_DIR / filename
@@ -167,6 +175,7 @@ HTML = r"""<!DOCTYPE html>
 <title>MD Converter</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
   :root {
     --bg:      #0b0d11;
@@ -411,11 +420,24 @@ HTML = r"""<!DOCTYPE html>
     transition: all 0.15s;
     white-space: nowrap;
   }
+  .btn-dl:hover { background: rgba(0,229,160,0.2); border-color: var(--accent); }
 
-  .btn-dl:hover {
-    background: rgba(0,229,160,0.2);
-    border-color: var(--accent);
+  .btn-copy {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 5px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    flex-shrink: 0;
+    transition: all 0.15s;
+    white-space: nowrap;
   }
+  .btn-copy:hover { background: rgba(255,255,255,0.08); color: var(--text); border-color: var(--muted); }
+  .btn-copy.copied { background: rgba(0,229,160,0.1); border-color: rgba(0,229,160,0.25); color: var(--accent); }
 
   /* Spinner */
   .spinner {
@@ -629,6 +651,160 @@ HTML = r"""<!DOCTYPE html>
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* ── Filter ── */
+  .filter-wrap { position: relative; }
+  .filter-input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 7px 10px 7px 30px;
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 11px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .filter-input:focus { border-color: var(--accent); }
+  .filter-input::placeholder { color: var(--muted); }
+  .filter-icon {
+    position: absolute;
+    left: 9px; top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+    color: var(--muted);
+    pointer-events: none;
+  }
+
+  /* ── Copy button ── */
+  .hist-copy {
+    font-size: 13px;
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: color 0.15s;
+    padding: 0 2px;
+    line-height: 1;
+  }
+  .hist-copy:hover { color: var(--accent); }
+  .hist-copy.copied { color: var(--accent); }
+
+  /* ── Preview modal ── */
+  .preview-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    z-index: 100;
+    backdrop-filter: blur(4px);
+    align-items: flex-start;
+    justify-content: center;
+    padding: 32px 24px;
+  }
+  .preview-overlay.open { display: flex; }
+
+  .preview-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    width: 100%;
+    max-width: 820px;
+    max-height: calc(100vh - 64px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: slideIn 0.2s ease;
+  }
+
+  .preview-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .preview-title {
+    flex: 1;
+    font-size: 11px;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .preview-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 11px;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .preview-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .preview-btn.copied { border-color: var(--accent); color: var(--accent); }
+
+  .preview-close {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 18px;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0 2px;
+    transition: color 0.15s;
+    flex-shrink: 0;
+  }
+  .preview-close:hover { color: var(--warn); }
+
+  .preview-content {
+    padding: 28px 32px;
+    overflow-y: auto;
+    flex: 1;
+    line-height: 1.75;
+    font-size: 13px;
+    color: var(--text);
+  }
+
+  .preview-fm {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin-bottom: 20px;
+    font-size: 11px;
+    color: var(--muted);
+    white-space: pre-wrap;
+    line-height: 1.6;
+  }
+
+  /* Markdown rendered */
+  .preview-content h1 { font-family: var(--display); font-size: 20px; font-weight: 700; margin: 0 0 16px; color: var(--accent); }
+  .preview-content h2 { font-size: 14px; font-weight: 700; margin: 24px 0 10px; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .preview-content h3 { font-size: 13px; font-weight: 600; margin: 16px 0 8px; color: var(--text); }
+  .preview-content p { margin: 0 0 12px; }
+  .preview-content a { color: var(--accent2); text-decoration: none; }
+  .preview-content a:hover { text-decoration: underline; }
+  .preview-content strong { color: var(--text); font-weight: 600; }
+  .preview-content hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .preview-content ul, .preview-content ol { padding-left: 20px; margin: 0 0 12px; }
+  .preview-content li { margin-bottom: 4px; }
+  .preview-content blockquote { border-left: 3px solid var(--border); padding-left: 12px; color: var(--muted); margin: 0 0 12px; }
+  .preview-content code { background: var(--bg); padding: 2px 5px; border-radius: 3px; font-size: 11px; color: #c084fc; }
+  .preview-content pre { background: var(--bg); padding: 12px 14px; border-radius: 6px; overflow-x: auto; margin: 12px 0; }
+  .preview-content pre code { color: var(--text); padding: 0; background: none; }
+  .preview-content table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 12px; }
+  .preview-content th, .preview-content td { border: 1px solid var(--border); padding: 7px 12px; text-align: left; }
+  .preview-content th { background: rgba(0,229,160,0.07); color: var(--accent); font-weight: 500; }
+  .preview-content tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
 </style>
 </head>
 <body>
@@ -636,7 +812,7 @@ HTML = r"""<!DOCTYPE html>
 <header>
   <div class="logo">MD<span>Convert</span></div>
   <div class="badge">local · localhost:5000</div>
-  <div class="badge" style="margin-left:auto">v2.1 · .docx .pdf .xlsx .html .csv .eml .msg</div>
+  <div class="badge" style="margin-left:auto">v2.2 · .docx .pdf .pptx .xlsx .html .csv .eml .msg</div>
 </header>
 
 <main>
@@ -654,6 +830,7 @@ HTML = r"""<!DOCTYPE html>
       <div class="file-types">
         <span class="ft ft-docx">DOCX</span>
         <span class="ft ft-pdf">PDF</span>
+        <span class="ft ft-docx">PPTX</span>
         <span class="ft ft-xlsx">XLSX</span>
         <span class="ft ft-html">HTML</span>
         <span class="ft ft-eml">EML</span>
@@ -662,11 +839,17 @@ HTML = r"""<!DOCTYPE html>
       </div>
     </div>
     <input type="file" id="file-input" multiple
-      accept=".docx,.pdf,.html,.htm,.xlsx,.csv,.eml,.msg">
+      accept=".docx,.pdf,.pptx,.html,.htm,.xlsx,.csv,.eml,.msg">
 
-    <!-- Results -->
+    <!-- Conversiones (lista unificada: en curso + historial) -->
     <div class="section-title">Conversiones</div>
-    <div class="results-list" id="results"></div>
+    <div class="filter-wrap">
+      <span class="filter-icon">⌕</span>
+      <input class="filter-input" id="conv-filter" placeholder="Filtrar archivos..." oninput="renderConversions()">
+    </div>
+    <div class="results-list" id="conversions-list">
+      <div class="empty-state">Sin archivos aún</div>
+    </div>
 
   </div>
 
@@ -694,20 +877,25 @@ HTML = r"""<!DOCTYPE html>
       </div>
     </div>
 
-    <!-- Recent files -->
-    <div class="section-title">Archivos generados</div>
-    <div class="history-list" id="history">
-      <div class="empty-state">Sin archivos aún</div>
-    </div>
-
   </div>
 </main>
+
+<!-- Preview modal -->
+<div class="preview-overlay" id="preview-overlay" onclick="closePreview(event)">
+  <div class="preview-box" onclick="event.stopPropagation()">
+    <div class="preview-header">
+      <span class="preview-title" id="preview-title"></span>
+      <button class="preview-btn" id="preview-copy-btn" onclick="copyPreviewContent()">⎘ Copiar</button>
+      <a class="preview-btn" id="preview-dl-btn" href="#" download>↓ Descargar</a>
+      <button class="preview-close" onclick="closePreview()">✕</button>
+    </div>
+    <div class="preview-content" id="preview-content"></div>
+  </div>
+</div>
 
 <script>
 const dropzone = document.getElementById('dropzone');
 const fileInput = document.getElementById('file-input');
-const results  = document.getElementById('results');
-const history  = document.getElementById('history');
 
 // ── Drag & Drop ──────────────────────────────────────────────────────────────
 
@@ -732,88 +920,181 @@ fileInput.addEventListener('change', () => {
 
 // ── Upload & Convert ─────────────────────────────────────────────────────────
 
+let allFiles   = [];
+let pendingMap = new Map();   // id → filename original
+let errorItems = [];          // [{name, error}]
+
 async function uploadFiles(files) {
+  // Registrar pendientes
+  const ids = files.map(f => {
+    const id = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    pendingMap.set(id, f.name);
+    return id;
+  });
+  renderConversions();
+
   const fd = new FormData();
   for (const f of files) fd.append('files', f);
-
-  // Pending items
-  const itemIds = files.map(f => addPending(f.name));
-
   const resp = await fetch('/convert', { method: 'POST', body: fd });
   const data = await resp.json();
 
-  // Remove pending
-  itemIds.forEach(id => document.getElementById(id)?.remove());
+  // Quitar pendientes de esta tanda
+  for (const id of ids) pendingMap.delete(id);
 
-  // Show results
-  for (const r of data) addResult(r);
+  // Acumular errores
+  for (const r of data) {
+    if (!r.ok) errorItems.unshift({ name: r.name, error: r.error || 'Error desconocido' });
+  }
 
-  refreshHistory();
+  await refreshConversions();
 }
 
-function addPending(name) {
-  const id = 'p_' + Date.now() + Math.random();
-  const el = document.createElement('div');
-  el.className = 'result-item converting';
-  el.id = id;
-  el.innerHTML = `
-    <div class="spinner"></div>
-    <div class="result-info">
-      <div class="result-name">${esc(name)}</div>
-      <div class="result-meta">Convirtiendo...</div>
-    </div>`;
-  results.prepend(el);
-  return id;
+// ── Lista unificada ───────────────────────────────────────────────────────────
+
+async function refreshConversions() {
+  const resp = await fetch('/files');
+  allFiles = await resp.json();
+  renderConversions();
 }
 
-function addResult(r) {
-  const el = document.createElement('div');
-  el.className = `result-item ${r.ok ? 'ok' : 'err'}`;
-  if (r.ok) {
-    el.innerHTML = `
-      <div class="result-icon">✓</div>
-      <div class="result-info">
-        <div class="result-name">${esc(r.name)}</div>
-        <div class="result-meta">Convertido correctamente</div>
-      </div>
-      <a class="btn-dl" href="/download/${encodeURIComponent(r.name)}" download>↓ Descargar</a>`;
-  } else {
-    el.innerHTML = `
-      <div class="result-icon">✗</div>
-      <div class="result-info">
-        <div class="result-name">${esc(r.name)}</div>
-        <div class="result-meta err-msg">${esc(r.error || 'Error desconocido')}</div>
+function renderConversions() {
+  const listEl = document.getElementById('conversions-list');
+  const q = (document.getElementById('conv-filter')?.value || '').toLowerCase();
+  const filtered = q ? allFiles.filter(f => f.name.toLowerCase().includes(q)) : allFiles;
+
+  let html = '';
+
+  // En curso
+  for (const [id, name] of pendingMap) {
+    html += `
+      <div class="result-item converting" id="${esc(id)}">
+        <div class="spinner"></div>
+        <div class="result-info">
+          <div class="result-name">${esc(name)}</div>
+          <div class="result-meta">Convirtiendo...</div>
+        </div>
       </div>`;
   }
-  results.prepend(el);
+
+  // Errores
+  for (const e of errorItems) {
+    html += `
+      <div class="result-item err">
+        <div class="result-icon">✗</div>
+        <div class="result-info">
+          <div class="result-name">${esc(e.name)}</div>
+          <div class="result-meta err-msg">${esc(e.error)}</div>
+        </div>
+      </div>`;
+  }
+
+  // Archivos del servidor
+  for (const f of filtered) {
+    html += `
+      <div class="result-item ok">
+        <div class="result-info" style="min-width:0;overflow:hidden">
+          <div class="result-name" onclick="previewFile('${esc(f.name)}')"
+               style="cursor:pointer" title="${esc(f.name)}">${esc(f.name)}</div>
+          <div class="result-meta">${f.size_kb} KB</div>
+        </div>
+        <button class="btn-copy" onclick="copyFile('${esc(f.name)}', this)">⎘ Copiar</button>
+        <a class="btn-dl" href="/download/${encodeURIComponent(f.name)}" download>↓ Descargar</a>
+      </div>`;
+  }
+
+  if (!html) {
+    html = `<div class="empty-state">${q ? 'Sin resultados' : 'Sin archivos aún'}</div>`;
+  }
+
+  listEl.innerHTML = html;
 }
 
-// ── History ──────────────────────────────────────────────────────────────────
+refreshConversions();
+setInterval(refreshConversions, 4000);
 
-async function refreshHistory() {
-  const resp = await fetch('/files');
-  const files = await resp.json();
-  history.innerHTML = files.length === 0
-    ? '<div class="empty-state">Sin archivos aún</div>'
-    : files.map(f => `
-      <div class="hist-item">
-        <span class="hist-name" title="${esc(f.name)}">📄 ${esc(f.name)}</span>
-        <span class="hist-size">${f.size_kb} KB</span>
-        <a class="hist-dl" href="/download/${encodeURIComponent(f.name)}" download title="Descargar">⬇</a>
-      </div>`).join('');
+// ── Copy to clipboard ────────────────────────────────────────────────────────
+
+async function copyFile(name, btn) {
+  try {
+    const resp = await fetch('/preview/' + encodeURIComponent(name));
+    const data = await resp.json();
+    await navigator.clipboard.writeText(data.content);
+    btn.classList.add('copied');
+    btn.textContent = '✓';
+    setTimeout(() => { btn.classList.remove('copied'); btn.textContent = '⎘'; }, 1800);
+  } catch (e) {
+    btn.textContent = '✗';
+    setTimeout(() => { btn.textContent = '⎘'; }, 1500);
+  }
 }
 
-refreshHistory();
-setInterval(refreshHistory, 4000);
+// ── Preview modal ─────────────────────────────────────────────────────────────
+
+let _previewContent = '';
+
+async function previewFile(name) {
+  const overlay  = document.getElementById('preview-overlay');
+  const titleEl  = document.getElementById('preview-title');
+  const contentEl = document.getElementById('preview-content');
+  const dlBtn    = document.getElementById('preview-dl-btn');
+  const copyBtn  = document.getElementById('preview-copy-btn');
+
+  titleEl.textContent = name;
+  contentEl.innerHTML = '<div class="empty-state">Cargando...</div>';
+  copyBtn.textContent = '⎘ Copiar';
+  copyBtn.classList.remove('copied');
+  dlBtn.href = '/download/' + encodeURIComponent(name);
+  dlBtn.download = name;
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  const resp = await fetch('/preview/' + encodeURIComponent(name));
+  const data = await resp.json();
+  _previewContent = data.content;
+  contentEl.innerHTML = renderMd(_previewContent);
+}
+
+function renderMd(raw) {
+  // Separar frontmatter YAML del cuerpo
+  const fm = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+  if (fm) {
+    return `<div class="preview-fm">${esc(fm[1])}</div>` + marked.parse(fm[2]);
+  }
+  return marked.parse(raw);
+}
+
+async function copyPreviewContent() {
+  const btn = document.getElementById('preview-copy-btn');
+  try {
+    await navigator.clipboard.writeText(_previewContent);
+    btn.textContent = '✓ Copiado';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = '⎘ Copiar'; btn.classList.remove('copied'); }, 1800);
+  } catch (e) {
+    btn.textContent = '✗ Error';
+    setTimeout(() => { btn.textContent = '⎘ Copiar'; }, 1500);
+  }
+}
+
+function closePreview(event) {
+  if (event && event.target !== document.getElementById('preview-overlay')) return;
+  document.getElementById('preview-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+  _previewContent = '';
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closePreview();
+});
 
 // ── Watch Folder ─────────────────────────────────────────────────────────────
 
 let watching = false;
 
 document.getElementById('btn-watch-start').addEventListener('click', async () => {
-  const folder = document.getElementById('watch-input').value.trim();
+  const folder  = document.getElementById('watch-input').value.trim();
   const statusEl = document.getElementById('watch-status');
-  const btn = document.getElementById('btn-watch-start');
+  const btn     = document.getElementById('btn-watch-start');
 
   if (watching) {
     await fetch('/watch/stop', { method: 'POST' });
@@ -864,16 +1145,15 @@ async function openFolder(type) {
   });
 }
 
-// Auto-start watch on load and sync UI state
 async function initWatcher() {
-  const res = await fetch('/watch/status');
+  const res  = await fetch('/watch/status');
   const data = await res.json();
   const statusEl = document.getElementById('watch-status');
-  const btn = document.getElementById('btn-watch-start');
+  const btn  = document.getElementById('btn-watch-start');
   const input = document.getElementById('watch-input');
   if (data.active && data.folder) {
     watching = true;
-    if (data.folder) input.value = data.folder;
+    input.value = data.folder;
     statusEl.className = 'watch-status active';
     statusEl.innerHTML = '<span class="pulse"></span>Vigilando: ' + esc(data.folder);
     btn.textContent = 'Detener';
@@ -882,9 +1162,6 @@ async function initWatcher() {
 }
 
 let OUTPUT_PATH = '';
-fetch('/files').then(r => r.json()).then(() => {});
-// Get output path from first file or derive it
-OUTPUT_PATH = '';
 fetch('/output-path').then(r => r.json()).then(d => { OUTPUT_PATH = d.path || ''; }).catch(() => {});
 
 initWatcher();
