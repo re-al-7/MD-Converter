@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -)",
+      "Bash(python -c ':*)",
+      "Bash(wc -l D:/mdconverter/converters/**/*.py D:/mdconverter/converters/*.py D:/mdconverter/convert_to_md.py)"
+    ]
+  }
+}
