@@ -172,6 +172,37 @@ La carpeta vigilada por defecto es `D:\mdconverter\correos\` y se inicia automá
 
 ---
 
+## Inicio automático con Windows
+
+Para que la aplicación arranque sola cada vez que inicies sesión en Windows, el proyecto incluye dos archivos:
+
+| Archivo | Descripción |
+|---|---|
+| `run_hidden.vbs` | Lanza `converter_ui.py` sin mostrar ventana de consola |
+| `setup_startup.py` | Instala o desinstala la entrada en el registro de Windows |
+
+### Activar el inicio automático
+
+```powershell
+python setup_startup.py install
+```
+
+Esto agrega una entrada en `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` (sin necesidad de permisos de administrador). A partir del próximo inicio de sesión, la app arrancará en segundo plano y abrirá `http://localhost:5000` en el navegador.
+
+### Otros comandos
+
+```powershell
+# Verificar si está instalado
+python setup_startup.py status
+
+# Desactivar el inicio automático
+python setup_startup.py uninstall
+```
+
+> **Nota:** Si usas un entorno virtual (`venv/`), el script lo detecta automáticamente. En caso contrario, usa el `pythonw.exe` del sistema.
+
+---
+
 ## Carpetas por defecto
 
 | Carpeta | Ruta | Descripción |
