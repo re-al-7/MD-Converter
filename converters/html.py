@@ -45,11 +45,25 @@ def _html_to_md_with_tables(html: str) -> str:
     import html2text
     from bs4 import BeautifulSoup
 
+    from bs4 import NavigableString
     soup = BeautifulSoup(html, 'html.parser')
 
     # Eliminar imágenes embebidas (cid:) — no tienen sentido fuera del cliente de correo
     for img in soup.find_all('img', src=lambda s: s and s.lower().startswith('cid:')):
         img.decompose()
+
+    # Outlook a veces escribe el número explícito dentro de cada <li> además del <ol>
+    # e.g. <li>1.\t<div>texto</div></li> → html2text produce "1. 1.\t texto"
+    # También envuelve el contenido en <div> que causa indentación extra en los items 2+.
+    # Fix: eliminar el nodo de texto con el número redundante y desenvolver los <div>.
+    for ol in soup.find_all('ol'):
+        for li in ol.find_all('li', recursive=False):
+            for child in list(li.children):
+                if isinstance(child, NavigableString) and re.match(r'^\d+\.[\t ]', str(child)):
+                    child.replace_with('')
+                    break
+            for div in li.find_all('div', recursive=False):
+                div.unwrap()
 
     tables_md: dict[str, str] = {}
 
@@ -73,7 +87,13 @@ def _html_to_md_with_tables(html: str) -> str:
     for placeholder, md in tables_md.items():
         result = result.replace(placeholder, f'\n{md}\n')
 
-    return result.strip()
+    result = result.strip()
+    # html2text produce "  N. " (2 espacios) para ítems de <ol> cuando el documento
+    # no empieza exactamente en el <ol>; tras .strip() el primer ítem pierde esos
+    # espacios mientras los siguientes los conservan → numeración asimétrica.
+    # Normalizamos eliminando el doble espacio de todos los ítems numerados.
+    result = re.sub(r'\n  (\d+\.) ', r'\n\1 ', result)
+    return result
 
 
 def convert_html(source: str, is_url: bool = False) -> str:
