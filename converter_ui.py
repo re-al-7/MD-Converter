@@ -339,6 +339,10 @@ HTML = r"""<!DOCTYPE html>
   .ft-html { background: rgba(255,184,108,0.12); color: var(--orange);  border: 1px solid rgba(255,184,108,0.2); }
   .ft-eml  { background: rgba(255,121,198,0.12); color: var(--pink);    border: 1px solid rgba(255,121,198,0.25); }
   .ft-csv  { background: rgba(189,147,249,0.12); color: var(--accent);  border: 1px solid rgba(189,147,249,0.2); }
+  .ft-epub { background: rgba(255,184,108,0.10); color: var(--orange);  border: 1px solid rgba(255,184,108,0.2); }
+  .ft-json { background: rgba(80,250,123,0.10);  color: var(--green);   border: 1px solid rgba(80,250,123,0.18); }
+  .ft-xml  { background: rgba(139,233,253,0.08); color: var(--accent2); border: 1px solid rgba(139,233,253,0.18); }
+  .ft-zip  { background: rgba(189,147,249,0.10); color: var(--accent);  border: 1px solid rgba(189,147,249,0.18); }
 
   #file-input { display: none; }
 
@@ -816,7 +820,7 @@ HTML = r"""<!DOCTYPE html>
 <header>
   <div class="logo">MD<span>Convert</span></div>
   <div class="badge">local · localhost:5000</div>
-  <div class="badge" style="margin-left:auto">v2.2 · .docx .pdf .pptx .xlsx .html .csv .eml .msg</div>
+  <div class="badge" style="margin-left:auto">v2.3 · .docx .pdf .pptx .xlsx .html .csv .eml .msg .epub .json .xml .zip</div>
 </header>
 
 <main>
@@ -840,10 +844,14 @@ HTML = r"""<!DOCTYPE html>
         <span class="ft ft-eml">EML</span>
         <span class="ft ft-eml">MSG</span>
         <span class="ft ft-csv">CSV</span>
+        <span class="ft ft-epub">EPUB</span>
+        <span class="ft ft-json">JSON</span>
+        <span class="ft ft-xml">XML</span>
+        <span class="ft ft-zip">ZIP</span>
       </div>
     </div>
     <input type="file" id="file-input" multiple
-      accept=".docx,.pdf,.pptx,.html,.htm,.xlsx,.csv,.eml,.msg">
+      accept=".docx,.pdf,.pptx,.html,.htm,.xlsx,.csv,.eml,.msg,.epub,.json,.xml,.zip">
 
     <!-- Conversiones (lista unificada: en curso + historial) -->
     <div class="section-title">Conversiones</div>
