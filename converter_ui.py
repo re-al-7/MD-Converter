@@ -20,7 +20,7 @@ from flask import Flask, request, jsonify, send_file, render_template_string
 SCRIPT_DIR = Path(__file__).parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from convert_to_md import convert_docx, convert_pdf, convert_html, convert_xlsx, convert_csv, convert_pptx, convert_eml, convert_msg
+from convert_to_md import convert_docx, convert_pdf, convert_html, convert_xlsx, convert_csv, convert_pptx, convert_eml, convert_msg, convert_with_markitdown, MARKITDOWN_EXTENSIONS
 
 app = Flask(__name__)
 OUTPUT_DIR = SCRIPT_DIR / "md_output"
@@ -63,7 +63,7 @@ def _start_watcher(folder_path: str) -> bool:
 
 # ─── Conversión ───────────────────────────────────────────────────────────────
 
-SUPPORTED = {".docx", ".pdf", ".pptx", ".html", ".htm", ".xlsx", ".csv", ".eml", ".msg"}
+SUPPORTED = {".docx", ".pdf", ".pptx", ".html", ".htm", ".xlsx", ".csv", ".eml", ".msg"} | MARKITDOWN_EXTENSIONS
 
 def do_convert(src: Path, out_dir: Path) -> list[dict]:
     ext = src.suffix.lower()
@@ -77,12 +77,13 @@ def do_convert(src: Path, out_dir: Path) -> list[dict]:
                 dest.write_text(content, encoding="utf-8")
                 results.append({"name": fname, "path": str(dest), "ok": True})
         else:
-            if ext == ".docx":        content = convert_docx(src)
-            elif ext == ".pptx":      content = convert_pptx(src)
-            elif ext == ".pdf":       content = convert_pdf(src)
+            if ext == ".docx":             content = convert_docx(src)
+            elif ext == ".pptx":           content = convert_pptx(src)
+            elif ext == ".pdf":            content = convert_pdf(src)
             elif ext in (".html", ".htm"): content = convert_html(str(src))
-            elif ext == ".xlsx":      content = convert_xlsx(src)
-            elif ext == ".csv":       content = convert_csv(src)
+            elif ext == ".xlsx":           content = convert_xlsx(src)
+            elif ext == ".csv":            content = convert_csv(src)
+            elif ext in MARKITDOWN_EXTENSIONS: content = convert_with_markitdown(src)
             else:
                 return [{"name": src.name, "ok": False, "error": f"Formato no soportado: {ext}"}]
             dest = out_dir / f"{src.stem}.md"

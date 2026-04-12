@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 convert_to_md.py — Conversor universal a Markdown
-Soporta: .docx, .pdf, .pptx, .html, .htm, .xlsx, .csv, .eml, .msg, URLs web
+Soporta: .docx, .pdf, .pptx, .html, .htm, .xlsx, .csv, .eml, .msg, .epub, .json, .xml, .zip, URLs web
 
 Uso:
     python convert_to_md.py archivo.docx
@@ -10,6 +10,8 @@ Uso:
     python convert_to_md.py datos.xlsx
     python convert_to_md.py pagina.html
     python convert_to_md.py correo.eml
+    python convert_to_md.py libro.epub
+    python convert_to_md.py datos.json
     python convert_to_md.py https://ejemplo.com
     python convert_to_md.py carpeta/           # Convierte todos los archivos soportados
 """
@@ -28,9 +30,11 @@ from converters import (
     convert_pptx,
     convert_eml,
     convert_msg,
+    convert_with_markitdown,
+    MARKITDOWN_EXTENSIONS,
 )
 
-SUPPORTED_EXTENSIONS = {".docx", ".pdf", ".pptx", ".html", ".htm", ".xlsx", ".csv", ".eml", ".msg"}
+SUPPORTED_EXTENSIONS = {".docx", ".pdf", ".pptx", ".html", ".htm", ".xlsx", ".csv", ".eml", ".msg"} | MARKITDOWN_EXTENSIONS
 
 
 def install_deps():
@@ -47,6 +51,7 @@ def install_deps():
         "requests",       # fetch URL
         "beautifulsoup4", # parseo HTML
         "extract-msg",    # .msg Outlook → datos estructurados
+        "markitdown[all]", # epub, json, xml, zip y más
     ]
     print("📦 Instalando dependencias...")
     subprocess.check_call([sys.executable, "-m", "pip", "install", "--quiet"] + deps)
@@ -101,6 +106,8 @@ def convert_file(source: str, output_dir: Path = None) -> Path | None:
                 print(f"   ✅ {fname} ({fpath.stat().st_size / 1024:.1f} KB)")
                 saved.append(fpath)
             return saved[0] if saved else None
+        elif ext in MARKITDOWN_EXTENSIONS:
+            content = convert_with_markitdown(Path(source))
         else:
             print(f"❌ Sin conversor para {ext}")
             return None
