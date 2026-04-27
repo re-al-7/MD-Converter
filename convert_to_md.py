@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 convert_to_md.py — Conversor universal a Markdown
-Soporta: .docx, .pdf, .html, .htm, .xlsx, .csv, .eml, .msg, URLs web
+Soporta: .docx, .pdf, .html, .htm, .xlsx, .csv, .eml, .msg, imágenes, URLs web
 
 Uso:
     python convert_to_md.py archivo.docx
@@ -9,6 +9,7 @@ Uso:
     python convert_to_md.py datos.xlsx
     python convert_to_md.py pagina.html
     python convert_to_md.py correo.eml
+    python convert_to_md.py imagen.png
     python convert_to_md.py https://ejemplo.com
     python convert_to_md.py carpeta/           # Convierte todos los archivos soportados
 """
@@ -26,9 +27,11 @@ from converters import (
     convert_csv,
     convert_eml,
     convert_msg,
+    convert_image,
+    IMAGE_EXTENSIONS,
 )
 
-SUPPORTED_EXTENSIONS = {".docx", ".pdf", ".html", ".htm", ".xlsx", ".csv", ".eml", ".msg"}
+SUPPORTED_EXTENSIONS = {".docx", ".pdf", ".html", ".htm", ".xlsx", ".csv", ".eml", ".msg"} | IMAGE_EXTENSIONS
 
 
 def install_deps():
@@ -44,6 +47,9 @@ def install_deps():
         "requests",       # fetch URL
         "beautifulsoup4", # parseo HTML
         "extract-msg",    # .msg Outlook → datos estructurados
+        "pytesseract",    # OCR imágenes (requiere Tesseract instalado)
+        "Pillow",         # carga de imágenes
+        "img2table",      # detección de tablas en imágenes (opcional)
     ]
     print("📦 Instalando dependencias...")
     subprocess.check_call([sys.executable, "-m", "pip", "install", "--quiet"] + deps)
@@ -85,6 +91,8 @@ def convert_file(source: str, output_dir: Path = None) -> Path | None:
             content = convert_xlsx(Path(source))
         elif ext == ".csv":
             content = convert_csv(Path(source))
+        elif ext in IMAGE_EXTENSIONS:
+            content = convert_image(Path(source))
         elif ext in (".eml", ".msg"):
             fn           = convert_eml if ext == ".eml" else convert_msg
             mail_results = fn(Path(source))

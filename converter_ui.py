@@ -20,7 +20,7 @@ from flask import Flask, request, jsonify, send_file, render_template_string
 SCRIPT_DIR = Path(__file__).parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from convert_to_md import convert_docx, convert_pdf, convert_html, convert_xlsx, convert_csv, convert_eml, convert_msg
+from convert_to_md import convert_docx, convert_pdf, convert_html, convert_xlsx, convert_csv, convert_eml, convert_msg, convert_image, IMAGE_EXTENSIONS
 
 app = Flask(__name__)
 OUTPUT_DIR = SCRIPT_DIR / "md_output"
@@ -63,7 +63,7 @@ def _start_watcher(folder_path: str) -> bool:
 
 # ─── Conversión ───────────────────────────────────────────────────────────────
 
-SUPPORTED = {".docx", ".pdf", ".html", ".htm", ".xlsx", ".csv", ".eml", ".msg"}
+SUPPORTED = {".docx", ".pdf", ".html", ".htm", ".xlsx", ".csv", ".eml", ".msg"} | IMAGE_EXTENSIONS
 
 def do_convert(src: Path, out_dir: Path) -> list[dict]:
     ext = src.suffix.lower()
@@ -77,11 +77,12 @@ def do_convert(src: Path, out_dir: Path) -> list[dict]:
                 dest.write_text(content, encoding="utf-8")
                 results.append({"name": fname, "path": str(dest), "ok": True})
         else:
-            if ext == ".docx":   content = convert_docx(src)
-            elif ext == ".pdf":  content = convert_pdf(src)
+            if ext == ".docx":             content = convert_docx(src)
+            elif ext == ".pdf":            content = convert_pdf(src)
             elif ext in (".html", ".htm"): content = convert_html(str(src))
-            elif ext == ".xlsx": content = convert_xlsx(src)
-            elif ext == ".csv":  content = convert_csv(src)
+            elif ext == ".xlsx":           content = convert_xlsx(src)
+            elif ext == ".csv":            content = convert_csv(src)
+            elif ext in IMAGE_EXTENSIONS:  content = convert_image(src)
             else:
                 return [{"name": src.name, "ok": False, "error": f"Formato no soportado: {ext}"}]
             dest = out_dir / f"{src.stem}.md"
@@ -325,6 +326,7 @@ HTML = r"""<!DOCTYPE html>
   .ft-html { background: rgba(255,165,0,0.12); color: #ffb347; border: 1px solid rgba(255,165,0,0.2); }
   .ft-eml  { background: rgba(160,100,255,0.15); color: #c084fc; border: 1px solid rgba(160,100,255,0.25); }
   .ft-csv  { background: rgba(100,200,255,0.12); color: #67e3ff; border: 1px solid rgba(100,200,255,0.2); }
+  .ft-img  { background: rgba(255,200,50,0.12); color: #fcd34d; border: 1px solid rgba(255,200,50,0.25); }
 
   #file-input { display: none; }
 
@@ -635,7 +637,7 @@ HTML = r"""<!DOCTYPE html>
 <header>
   <div class="logo">MD<span>Convert</span></div>
   <div class="badge">local · localhost:5000</div>
-  <div class="badge" style="margin-left:auto">v2.1 · .docx .pdf .xlsx .html .csv .eml .msg</div>
+  <div class="badge" style="margin-left:auto">v2.2 · .docx .pdf .xlsx .html .csv .eml .msg .png .jpg…</div>
 </header>
 
 <main>
@@ -658,10 +660,11 @@ HTML = r"""<!DOCTYPE html>
         <span class="ft ft-eml">EML</span>
         <span class="ft ft-eml">MSG</span>
         <span class="ft ft-csv">CSV</span>
+        <span class="ft ft-img">IMG</span>
       </div>
     </div>
     <input type="file" id="file-input" multiple
-      accept=".docx,.pdf,.html,.htm,.xlsx,.csv,.eml,.msg">
+      accept=".docx,.pdf,.html,.htm,.xlsx,.csv,.eml,.msg,.jpg,.jpeg,.png,.bmp,.tiff,.tif,.webp">
 
     <!-- Results -->
     <div class="section-title">Conversiones</div>
