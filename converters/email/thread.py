@@ -193,7 +193,10 @@ def _clean_msg_segment(text: str) -> str:
     result = textwrap.dedent(result).strip()
     result = re.sub(r'\n{3,}', '\n\n', result)
     result = re.sub(r'\s*<mailto:[^>]+>', '', result)
-    return result
+    # Eliminar referencias a imágenes embebidas cid: (inútiles fuera del cliente de correo)
+    result = re.sub(r'!\[[^\]]*\]\(cid:[^)]+\)', '', result)
+    result = re.sub(r'\n{3,}', '\n\n', result)
+    return result.strip()
 
 
 def _split_thread(body: str) -> list[dict]:

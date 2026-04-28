@@ -20,7 +20,7 @@ from flask import Flask, request, jsonify, send_file, render_template_string
 SCRIPT_DIR = Path(__file__).parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from convert_to_md import convert_docx, convert_pdf, convert_html, convert_xlsx, convert_csv, convert_eml, convert_msg, convert_image, IMAGE_EXTENSIONS
+from convert_to_md import convert_docx, convert_pdf, convert_html, convert_xlsx, convert_csv, convert_pptx, convert_eml, convert_msg, convert_with_markitdown, MARKITDOWN_EXTENSIONS, convert_image, IMAGE_EXTENSIONS
 
 app = Flask(__name__)
 OUTPUT_DIR = SCRIPT_DIR / "md_output"
@@ -63,7 +63,7 @@ def _start_watcher(folder_path: str) -> bool:
 
 # ─── Conversión ───────────────────────────────────────────────────────────────
 
-SUPPORTED = {".docx", ".pdf", ".html", ".htm", ".xlsx", ".csv", ".eml", ".msg"} | IMAGE_EXTENSIONS
+SUPPORTED = {".docx", ".pdf", ".pptx", ".html", ".htm", ".xlsx", ".csv", ".eml", ".msg"} | MARKITDOWN_EXTENSIONS | IMAGE_EXTENSIONS
 
 def do_convert(src: Path, out_dir: Path) -> list[dict]:
     ext = src.suffix.lower()
@@ -78,11 +78,13 @@ def do_convert(src: Path, out_dir: Path) -> list[dict]:
                 results.append({"name": fname, "path": str(dest), "ok": True})
         else:
             if ext == ".docx":             content = convert_docx(src)
+            elif ext == ".pptx":           content = convert_pptx(src)
             elif ext == ".pdf":            content = convert_pdf(src)
             elif ext in (".html", ".htm"): content = convert_html(str(src))
             elif ext == ".xlsx":           content = convert_xlsx(src)
             elif ext == ".csv":            content = convert_csv(src)
             elif ext in IMAGE_EXTENSIONS:  content = convert_image(src)
+            elif ext in MARKITDOWN_EXTENSIONS: content = convert_with_markitdown(src)
             else:
                 return [{"name": src.name, "ok": False, "error": f"Formato no soportado: {ext}"}]
             dest = out_dir / f"{src.stem}.md"
@@ -115,6 +117,14 @@ def convert():
         tmp.unlink(missing_ok=True)
 
     return jsonify(all_results)
+
+
+@app.route("/preview/<path:filename>")
+def preview(filename):
+    fp = OUTPUT_DIR / filename
+    if not fp.exists():
+        return jsonify({"error": "Archivo no encontrado"}), 404
+    return jsonify({"content": fp.read_text(encoding="utf-8")})
 
 
 @app.route("/download/<path:filename>")
@@ -167,16 +177,20 @@ HTML = r"""<!DOCTYPE html>
 <title>MD Converter</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
   :root {
-    --bg:      #0b0d11;
-    --surface: #13161d;
-    --border:  #1f2330;
-    --accent:  #00e5a0;
-    --accent2: #0066ff;
-    --warn:    #ff4d6d;
-    --text:    #e2e8f0;
-    --muted:   #4a5568;
+    --bg:      #282a36;
+    --surface: #21222c;
+    --border:  #44475a;
+    --accent:  #bd93f9;
+    --accent2: #8be9fd;
+    --warn:    #ff5555;
+    --text:    #f8f8f2;
+    --muted:   #6272a4;
+    --green:   #50fa7b;
+    --pink:    #ff79c6;
+    --orange:  #ffb86c;
     --mono:    'DM Mono', monospace;
     --display: 'Syne', sans-serif;
   }
@@ -265,18 +279,18 @@ HTML = r"""<!DOCTYPE html>
     content: '';
     position: absolute; inset: 0;
     border-radius: 6px;
-    background: radial-gradient(ellipse at 50% 0%, rgba(0,229,160,0.04) 0%, transparent 70%);
+    background: radial-gradient(ellipse at 50% 0%, rgba(189,147,249,0.04) 0%, transparent 70%);
     pointer-events: none;
   }
 
   .dropzone.drag-over {
     border-color: var(--accent);
-    background: rgba(0,229,160,0.05);
+    background: rgba(189,147,249,0.05);
     transform: scale(1.005);
   }
 
   .dropzone.drag-over::before {
-    background: radial-gradient(ellipse at 50% 0%, rgba(0,229,160,0.12) 0%, transparent 70%);
+    background: radial-gradient(ellipse at 50% 0%, rgba(189,147,249,0.12) 0%, transparent 70%);
   }
 
   .drop-icon {
@@ -327,6 +341,10 @@ HTML = r"""<!DOCTYPE html>
   .ft-eml  { background: rgba(160,100,255,0.15); color: #c084fc; border: 1px solid rgba(160,100,255,0.25); }
   .ft-csv  { background: rgba(100,200,255,0.12); color: #67e3ff; border: 1px solid rgba(100,200,255,0.2); }
   .ft-img  { background: rgba(255,200,50,0.12); color: #fcd34d; border: 1px solid rgba(255,200,50,0.25); }
+  .ft-epub { background: rgba(255,184,108,0.10); color: var(--orange);  border: 1px solid rgba(255,184,108,0.2); }
+  .ft-json { background: rgba(80,250,123,0.10);  color: var(--green);   border: 1px solid rgba(80,250,123,0.18); }
+  .ft-xml  { background: rgba(139,233,253,0.08); color: var(--accent2); border: 1px solid rgba(139,233,253,0.18); }
+  .ft-zip  { background: rgba(189,147,249,0.10); color: var(--accent);  border: 1px solid rgba(189,147,249,0.18); }
 
   #file-input { display: none; }
 
@@ -398,8 +416,8 @@ HTML = r"""<!DOCTYPE html>
   .result-meta.err-msg { color: var(--warn); }
 
   .btn-dl {
-    background: rgba(0,229,160,0.1);
-    border: 1px solid rgba(0,229,160,0.25);
+    background: rgba(189,147,249,0.1);
+    border: 1px solid rgba(189,147,249,0.25);
     color: var(--accent);
     padding: 5px 12px;
     border-radius: 4px;
@@ -412,11 +430,24 @@ HTML = r"""<!DOCTYPE html>
     transition: all 0.15s;
     white-space: nowrap;
   }
+  .btn-dl:hover { background: rgba(189,147,249,0.2); border-color: var(--accent); }
 
-  .btn-dl:hover {
-    background: rgba(0,229,160,0.2);
-    border-color: var(--accent);
+  .btn-copy {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 5px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    flex-shrink: 0;
+    transition: all 0.15s;
+    white-space: nowrap;
   }
+  .btn-copy:hover { background: rgba(255,255,255,0.08); color: var(--text); border-color: var(--muted); }
+  .btn-copy.copied { background: rgba(189,147,249,0.1); border-color: rgba(189,147,249,0.25); color: var(--accent); }
 
   /* Spinner */
   .spinner {
@@ -466,7 +497,7 @@ HTML = r"""<!DOCTYPE html>
     margin-bottom: 12px;
   }
 
-  .watch-desc strong { color: #c084fc; }
+  .watch-desc strong { color: var(--accent); }
 
   .input-row {
     display: flex;
@@ -491,7 +522,7 @@ HTML = r"""<!DOCTYPE html>
 
   .btn-primary {
     background: var(--accent);
-    color: #000;
+    color: var(--bg);
     border: none;
     padding: 7px 14px;
     border-radius: 4px;
@@ -529,15 +560,15 @@ HTML = r"""<!DOCTYPE html>
 
   .watch-status.active {
     display: block;
-    background: rgba(0,229,160,0.1);
-    border: 1px solid rgba(0,229,160,0.2);
+    background: rgba(189,147,249,0.1);
+    border: 1px solid rgba(189,147,249,0.2);
     color: var(--accent);
   }
 
   .watch-status.inactive {
     display: block;
-    background: rgba(255,77,109,0.1);
-    border: 1px solid rgba(255,77,109,0.2);
+    background: rgba(255,85,85,0.1);
+    border: 1px solid rgba(255,85,85,0.2);
     color: var(--warn);
   }
 
@@ -737,14 +768,168 @@ HTML = r"""<!DOCTYPE html>
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* ── Filter ── */
+  .filter-wrap { position: relative; }
+  .filter-input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 7px 10px 7px 30px;
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 11px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .filter-input:focus { border-color: var(--accent); }
+  .filter-input::placeholder { color: var(--muted); }
+  .filter-icon {
+    position: absolute;
+    left: 9px; top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+    color: var(--muted);
+    pointer-events: none;
+  }
+
+  /* ── Copy button ── */
+  .hist-copy {
+    font-size: 13px;
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: color 0.15s;
+    padding: 0 2px;
+    line-height: 1;
+  }
+  .hist-copy:hover { color: var(--accent); }
+  .hist-copy.copied { color: var(--accent); }
+
+  /* ── Preview modal ── */
+  .preview-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    z-index: 100;
+    backdrop-filter: blur(4px);
+    align-items: flex-start;
+    justify-content: center;
+    padding: 32px 24px;
+  }
+  .preview-overlay.open { display: flex; }
+
+  .preview-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    width: 100%;
+    max-width: 820px;
+    max-height: calc(100vh - 64px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: slideIn 0.2s ease;
+  }
+
+  .preview-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .preview-title {
+    flex: 1;
+    font-size: 11px;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .preview-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 11px;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .preview-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .preview-btn.copied { border-color: var(--accent); color: var(--accent); }
+
+  .preview-close {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 18px;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0 2px;
+    transition: color 0.15s;
+    flex-shrink: 0;
+  }
+  .preview-close:hover { color: var(--warn); }
+
+  .preview-content {
+    padding: 28px 32px;
+    overflow-y: auto;
+    flex: 1;
+    line-height: 1.75;
+    font-size: 13px;
+    color: var(--text);
+  }
+
+  .preview-fm {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin-bottom: 20px;
+    font-size: 11px;
+    color: var(--muted);
+    white-space: pre-wrap;
+    line-height: 1.6;
+  }
+
+  /* Markdown rendered */
+  .preview-content h1 { font-family: var(--display); font-size: 20px; font-weight: 700; margin: 0 0 16px; color: var(--accent); }
+  .preview-content h2 { font-size: 14px; font-weight: 700; margin: 24px 0 10px; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .preview-content h3 { font-size: 13px; font-weight: 600; margin: 16px 0 8px; color: var(--text); }
+  .preview-content p { margin: 0 0 12px; }
+  .preview-content a { color: var(--accent2); text-decoration: none; }
+  .preview-content a:hover { text-decoration: underline; }
+  .preview-content strong { color: var(--text); font-weight: 600; }
+  .preview-content hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .preview-content ul, .preview-content ol { padding-left: 20px; margin: 0 0 12px; }
+  .preview-content li { margin-bottom: 4px; }
+  .preview-content blockquote { border-left: 3px solid var(--border); padding-left: 12px; color: var(--muted); margin: 0 0 12px; }
+  .preview-content code { background: var(--bg); padding: 2px 5px; border-radius: 3px; font-size: 11px; color: var(--pink); }
+  .preview-content pre { background: var(--bg); padding: 12px 14px; border-radius: 6px; overflow-x: auto; margin: 12px 0; }
+  .preview-content pre code { color: var(--text); padding: 0; background: none; }
+  .preview-content table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 12px; }
+  .preview-content th, .preview-content td { border: 1px solid var(--border); padding: 7px 12px; text-align: left; }
+  .preview-content th { background: rgba(189,147,249,0.07); color: var(--accent); font-weight: 500; }
+  .preview-content tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
 </style>
 </head>
 <body>
 
 <header>
   <div class="logo">MD<span>Convert</span></div>
-  <div class="badge">local · localhost:5000</div>
-  <div class="badge" style="margin-left:auto">v2.2 · .docx .pdf .xlsx .html .csv .eml .msg .png .jpg…</div>
+  <div class="badge">local · localhost:5000</div>  
+  <div class="badge" style="margin-left:auto">v2.3 · .docx .pdf .pptx .xlsx .html .csv .eml .msg .epub .json .xml .zip .png .jpg…</div>
 </header>
 
 <main>
@@ -762,6 +947,7 @@ HTML = r"""<!DOCTYPE html>
       <div class="file-types">
         <span class="ft ft-docx">DOCX</span>
         <span class="ft ft-pdf">PDF</span>
+        <span class="ft ft-docx">PPTX</span>
         <span class="ft ft-xlsx">XLSX</span>
         <span class="ft ft-html">HTML</span>
         <span class="ft ft-eml">EML</span>
@@ -772,10 +958,24 @@ HTML = r"""<!DOCTYPE html>
     </div>
     <input type="file" id="file-input" multiple
       accept=".docx,.pdf,.html,.htm,.xlsx,.csv,.eml,.msg,.jpg,.jpeg,.png,.bmp,.tiff,.tif,.webp">
+        <span class="ft ft-epub">EPUB</span>
+        <span class="ft ft-json">JSON</span>
+        <span class="ft ft-xml">XML</span>
+        <span class="ft ft-zip">ZIP</span>
+      </div>
+    </div>
+    <input type="file" id="file-input" multiple
+      accept=".docx,.pdf,.pptx,.html,.htm,.xlsx,.csv,.eml,.msg,.epub,.json,.xml,.zip">
 
-    <!-- Results -->
+    <!-- Conversiones (lista unificada: en curso + historial) -->
     <div class="section-title">Conversiones</div>
-    <div class="results-list" id="results"></div>
+    <div class="filter-wrap">
+      <span class="filter-icon">⌕</span>
+      <input class="filter-input" id="conv-filter" placeholder="Filtrar archivos..." oninput="renderConversions()">
+    </div>
+    <div class="results-list" id="conversions-list">
+      <div class="empty-state">Sin archivos aún</div>
+    </div>
 
   </div>
 
@@ -824,20 +1024,25 @@ HTML = r"""<!DOCTYPE html>
       </div>
     </div>
 
-    <!-- Recent files -->
-    <div class="section-title">Archivos generados</div>
-    <div class="history-list" id="history">
-      <div class="empty-state">Sin archivos aún</div>
-    </div>
-
   </div>
 </main>
+
+<!-- Preview modal -->
+<div class="preview-overlay" id="preview-overlay" onclick="closePreview(event)">
+  <div class="preview-box" onclick="event.stopPropagation()">
+    <div class="preview-header">
+      <span class="preview-title" id="preview-title"></span>
+      <button class="preview-btn" id="preview-copy-btn" onclick="copyPreviewContent()">⎘ Copiar</button>
+      <a class="preview-btn" id="preview-dl-btn" href="#" download>↓ Descargar</a>
+      <button class="preview-close" onclick="closePreview()">✕</button>
+    </div>
+    <div class="preview-content" id="preview-content"></div>
+  </div>
+</div>
 
 <script>
 const dropzone = document.getElementById('dropzone');
 const fileInput = document.getElementById('file-input');
-const results  = document.getElementById('results');
-const history  = document.getElementById('history');
 
 // ── Drag & Drop ──────────────────────────────────────────────────────────────
 
@@ -862,38 +1067,41 @@ fileInput.addEventListener('change', () => {
 
 // ── Upload & Convert ─────────────────────────────────────────────────────────
 
+let allFiles   = [];
+let pendingMap = new Map();   // id → filename original
+let errorItems = [];          // [{name, error}]
+
 async function uploadFiles(files) {
+  // Registrar pendientes
+  const ids = files.map(f => {
+    const id = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    pendingMap.set(id, f.name);
+    return id;
+  });
+  renderConversions();
+
   const fd = new FormData();
   for (const f of files) fd.append('files', f);
-
-  // Pending items
-  const itemIds = files.map(f => addPending(f.name));
-
   const resp = await fetch('/convert', { method: 'POST', body: fd });
   const data = await resp.json();
 
-  // Remove pending
-  itemIds.forEach(id => document.getElementById(id)?.remove());
+  // Quitar pendientes de esta tanda
+  for (const id of ids) pendingMap.delete(id);
 
-  // Show results
-  for (const r of data) addResult(r);
+  // Acumular errores
+  for (const r of data) {
+    if (!r.ok) errorItems.unshift({ name: r.name, error: r.error || 'Error desconocido' });
+  }
 
-  refreshHistory();
+  await refreshConversions();
 }
 
-function addPending(name) {
-  const id = 'p_' + Date.now() + Math.random();
-  const el = document.createElement('div');
-  el.className = 'result-item converting';
-  el.id = id;
-  el.innerHTML = `
-    <div class="spinner"></div>
-    <div class="result-info">
-      <div class="result-name">${esc(name)}</div>
-      <div class="result-meta">Convirtiendo...</div>
-    </div>`;
-  results.prepend(el);
-  return id;
+// ── Lista unificada ───────────────────────────────────────────────────────────
+
+async function refreshConversions() {
+  const resp = await fetch('/files');
+  allFiles = await resp.json();
+  renderConversions();
 }
 
 function addResult(r) {
@@ -918,12 +1126,76 @@ function addResult(r) {
       <div class="result-info">
         <div class="result-name">${esc(r.name)}</div>
         <div class="result-meta err-msg">${esc(r.error || 'Error desconocido')}</div>
+function renderConversions() {
+  const listEl = document.getElementById('conversions-list');
+  const q = (document.getElementById('conv-filter')?.value || '').toLowerCase();
+  const filtered = q ? allFiles.filter(f => f.name.toLowerCase().includes(q)) : allFiles;
+
+  let html = '';
+
+  // En curso
+  for (const [id, name] of pendingMap) {
+    html += `
+      <div class="result-item converting" id="${esc(id)}">
+        <div class="spinner"></div>
+        <div class="result-info">
+          <div class="result-name">${esc(name)}</div>
+          <div class="result-meta">Convirtiendo...</div>
+        </div>
       </div>`;
   }
-  results.prepend(el);
+
+  // Errores
+  for (const e of errorItems) {
+    html += `
+      <div class="result-item err">
+        <div class="result-icon">✗</div>
+        <div class="result-info">
+          <div class="result-name">${esc(e.name)}</div>
+          <div class="result-meta err-msg">${esc(e.error)}</div>
+        </div>
+      </div>`;
+  }
+
+  // Archivos del servidor
+  for (const f of filtered) {
+    html += `
+      <div class="result-item ok">
+        <div class="result-info" style="min-width:0;overflow:hidden">
+          <div class="result-name" onclick="previewFile('${esc(f.name)}')"
+               style="cursor:pointer" title="${esc(f.name)}">${esc(f.name)}</div>
+          <div class="result-meta">${f.size_kb} KB</div>
+        </div>
+        <button class="btn-copy" onclick="copyFile('${esc(f.name)}', this)">⎘ Copiar</button>
+        <a class="btn-dl" href="/download/${encodeURIComponent(f.name)}" download>↓ Descargar</a>
+      </div>`;
+  }
+
+  if (!html) {
+    html = `<div class="empty-state">${q ? 'Sin resultados' : 'Sin archivos aún'}</div>`;
+  }
+
+  listEl.innerHTML = html;
 }
 
-// ── History ──────────────────────────────────────────────────────────────────
+refreshConversions();
+setInterval(refreshConversions, 4000);
+
+// ── Copy to clipboard ────────────────────────────────────────────────────────
+
+async function copyFile(name, btn) {
+  try {
+    const resp = await fetch('/preview/' + encodeURIComponent(name));
+    const data = await resp.json();
+    await navigator.clipboard.writeText(data.content);
+    btn.classList.add('copied');
+    btn.textContent = '✓';
+    setTimeout(() => { btn.classList.remove('copied'); btn.textContent = '⎘'; }, 1800);
+  } catch (e) {
+    btn.textContent = '✗';
+    setTimeout(() => { btn.textContent = '⎘'; }, 1500);
+  }
+}
 
 async function refreshHistory() {
   const resp = await fetch('/files');
@@ -977,15 +1249,73 @@ async function copyMd() {
 
 refreshHistory();
 setInterval(refreshHistory, 4000);
+// ── Preview modal ─────────────────────────────────────────────────────────────
+
+let _previewContent = '';
+
+async function previewFile(name) {
+  const overlay  = document.getElementById('preview-overlay');
+  const titleEl  = document.getElementById('preview-title');
+  const contentEl = document.getElementById('preview-content');
+  const dlBtn    = document.getElementById('preview-dl-btn');
+  const copyBtn  = document.getElementById('preview-copy-btn');
+
+  titleEl.textContent = name;
+  contentEl.innerHTML = '<div class="empty-state">Cargando...</div>';
+  copyBtn.textContent = '⎘ Copiar';
+  copyBtn.classList.remove('copied');
+  dlBtn.href = '/download/' + encodeURIComponent(name);
+  dlBtn.download = name;
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  const resp = await fetch('/preview/' + encodeURIComponent(name));
+  const data = await resp.json();
+  _previewContent = data.content;
+  contentEl.innerHTML = renderMd(_previewContent);
+}
+
+function renderMd(raw) {
+  // Separar frontmatter YAML del cuerpo
+  const fm = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+  if (fm) {
+    return `<div class="preview-fm">${esc(fm[1])}</div>` + marked.parse(fm[2]);
+  }
+  return marked.parse(raw);
+}
+
+async function copyPreviewContent() {
+  const btn = document.getElementById('preview-copy-btn');
+  try {
+    await navigator.clipboard.writeText(_previewContent);
+    btn.textContent = '✓ Copiado';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = '⎘ Copiar'; btn.classList.remove('copied'); }, 1800);
+  } catch (e) {
+    btn.textContent = '✗ Error';
+    setTimeout(() => { btn.textContent = '⎘ Copiar'; }, 1500);
+  }
+}
+
+function closePreview(event) {
+  if (event && event.target !== document.getElementById('preview-overlay')) return;
+  document.getElementById('preview-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+  _previewContent = '';
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closePreview();
+});
 
 // ── Watch Folder ─────────────────────────────────────────────────────────────
 
 let watching = false;
 
 document.getElementById('btn-watch-start').addEventListener('click', async () => {
-  const folder = document.getElementById('watch-input').value.trim();
+  const folder  = document.getElementById('watch-input').value.trim();
   const statusEl = document.getElementById('watch-status');
-  const btn = document.getElementById('btn-watch-start');
+  const btn     = document.getElementById('btn-watch-start');
 
   if (watching) {
     await fetch('/watch/stop', { method: 'POST' });
@@ -1036,16 +1366,15 @@ async function openFolder(type) {
   });
 }
 
-// Auto-start watch on load and sync UI state
 async function initWatcher() {
-  const res = await fetch('/watch/status');
+  const res  = await fetch('/watch/status');
   const data = await res.json();
   const statusEl = document.getElementById('watch-status');
-  const btn = document.getElementById('btn-watch-start');
+  const btn  = document.getElementById('btn-watch-start');
   const input = document.getElementById('watch-input');
   if (data.active && data.folder) {
     watching = true;
-    if (data.folder) input.value = data.folder;
+    input.value = data.folder;
     statusEl.className = 'watch-status active';
     statusEl.innerHTML = '<span class="pulse"></span>Vigilando: ' + esc(data.folder);
     btn.textContent = 'Detener';
@@ -1054,9 +1383,6 @@ async function initWatcher() {
 }
 
 let OUTPUT_PATH = '';
-fetch('/files').then(r => r.json()).then(() => {});
-// Get output path from first file or derive it
-OUTPUT_PATH = '';
 fetch('/output-path').then(r => r.json()).then(d => { OUTPUT_PATH = d.path || ''; }).catch(() => {});
 
 initWatcher();
@@ -1115,11 +1441,30 @@ def index():
 
 # ─── Arranque ─────────────────────────────────────────────────────────────────
 
+def _clear_folder(folder: Path) -> int:
+    """Elimina todos los archivos de una carpeta. Retorna el número de archivos eliminados."""
+    count = 0
+    if folder.exists():
+        for f in folder.iterdir():
+            if f.is_file():
+                f.unlink()
+                count += 1
+    return count
+
+
 if __name__ == "__main__":
     print("\n  MD Converter UI")
     print(f"  → http://localhost:5000")
     print(f"  → Archivos convertidos en: {OUTPUT_DIR}")
     print("  → Ctrl+C para detener\n")
+
+    # Limpiar carpetas al arrancar
+    correos_dir = Path(DEFAULT_WATCH_DIR)
+    n_correos   = _clear_folder(correos_dir)
+    n_output    = _clear_folder(OUTPUT_DIR)
+    if n_correos or n_output:
+        print(f"  🗑  Limpieza inicial: {n_correos} correo(s), {n_output} md(s) eliminados")
+
     # Auto-iniciar escucha en carpeta por defecto
     if _start_watcher(DEFAULT_WATCH_DIR):
         print(f"  👁  Escuchando: {DEFAULT_WATCH_DIR}")

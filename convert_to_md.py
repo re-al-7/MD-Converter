@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 """
 convert_to_md.py — Conversor universal a Markdown
-Soporta: .docx, .pdf, .html, .htm, .xlsx, .csv, .eml, .msg, imágenes, URLs web
+
+Soporta: .docx, .pdf, .pptx, .html, .htm, .xlsx, .csv, .eml, .msg, .epub, .json, .xml, .zip, imágenes, URLs web
 
 Uso:
     python convert_to_md.py archivo.docx
+    python convert_to_md.py presentacion.pptx
     python convert_to_md.py reporte.pdf
     python convert_to_md.py datos.xlsx
     python convert_to_md.py pagina.html
     python convert_to_md.py correo.eml
     python convert_to_md.py imagen.png
+    python convert_to_md.py libro.epub
+    python convert_to_md.py datos.json
     python convert_to_md.py https://ejemplo.com
     python convert_to_md.py carpeta/           # Convierte todos los archivos soportados
 """
@@ -25,13 +29,16 @@ from converters import (
     convert_html,
     convert_xlsx,
     convert_csv,
+    convert_pptx,
     convert_eml,
     convert_msg,
     convert_image,
     IMAGE_EXTENSIONS,
+    convert_with_markitdown,
+    MARKITDOWN_EXTENSIONS,
 )
 
-SUPPORTED_EXTENSIONS = {".docx", ".pdf", ".html", ".htm", ".xlsx", ".csv", ".eml", ".msg"} | IMAGE_EXTENSIONS
+SUPPORTED_EXTENSIONS = {".docx", ".pdf", ".pptx", ".html", ".htm", ".xlsx", ".csv", ".eml", ".msg"} | MARKITDOWN_EXTENSIONS | IMAGE_EXTENSIONS
 
 
 def install_deps():
@@ -40,6 +47,7 @@ def install_deps():
     deps = [
         "mammoth",        # docx → md
         "pdfplumber",     # pdf → texto
+        "python-pptx",    # pptx → md
         "html2text",      # html → md
         "pandas",         # xlsx/csv → md
         "openpyxl",       # motor Excel para pandas
@@ -50,6 +58,7 @@ def install_deps():
         "pytesseract",    # OCR imágenes (requiere Tesseract instalado)
         "Pillow",         # carga de imágenes
         "img2table",      # detección de tablas en imágenes (opcional)
+        "markitdown[all]", # epub, json, xml, zip y más
     ]
     print("📦 Instalando dependencias...")
     subprocess.check_call([sys.executable, "-m", "pip", "install", "--quiet"] + deps)
@@ -85,6 +94,8 @@ def convert_file(source: str, output_dir: Path = None) -> Path | None:
             content = convert_html(source, is_url=is_url)
         elif ext == ".docx":
             content = convert_docx(Path(source))
+        elif ext == ".pptx":
+            content = convert_pptx(Path(source))
         elif ext == ".pdf":
             content = convert_pdf(Path(source))
         elif ext == ".xlsx":
@@ -104,6 +115,8 @@ def convert_file(source: str, output_dir: Path = None) -> Path | None:
                 print(f"   ✅ {fname} ({fpath.stat().st_size / 1024:.1f} KB)")
                 saved.append(fpath)
             return saved[0] if saved else None
+        elif ext in MARKITDOWN_EXTENSIONS:
+            content = convert_with_markitdown(Path(source))
         else:
             print(f"❌ Sin conversor para {ext}")
             return None

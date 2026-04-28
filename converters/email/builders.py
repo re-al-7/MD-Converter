@@ -12,6 +12,31 @@ from pathlib import Path
 _PROJECT_ROOT = Path(__file__).parent.parent.parent
 
 
+# ─── Encoding ─────────────────────────────────────────────────────────────────
+
+def _decode_bytes(data: bytes, hint_charset: str = None) -> str:
+    """
+    Decodifica bytes probando el charset sugerido y luego fallbacks comunes.
+    Evita caracteres de reemplazo (\ufffd) que aparecen cuando el charset
+    declarado no coincide con el encoding real del contenido.
+    """
+    candidates = []
+    if hint_charset:
+        candidates.append(hint_charset)
+    candidates += ['utf-8', 'windows-1252', 'latin-1']
+
+    for enc in candidates:
+        try:
+            text = data.decode(enc)
+            # Rechazar si hay demasiados caracteres de reemplazo
+            if text.count('\ufffd') / max(len(text), 1) < 0.01:
+                return text
+        except (UnicodeDecodeError, LookupError):
+            continue
+
+    return data.decode('utf-8', errors='replace')
+
+
 # ─── Helpers de formato ───────────────────────────────────────────────────────
 
 def _parse_addresses(raw: str) -> list[str]:

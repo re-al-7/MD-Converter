@@ -3,7 +3,12 @@
     "allow": [
       "Bash(python -)",
       "Bash(python -c ':*)",
-      "Bash(wc -l D:/mdconverter/converters/**/*.py D:/mdconverter/converters/*.py D:/mdconverter/convert_to_md.py)"
+      "Bash(wc -l D:/mdconverter/converters/**/*.py D:/mdconverter/converters/*.py D:/mdconverter/convert_to_md.py)",
+      "Bash(python:*)",
+      "WebFetch(domain:github.com)",
+      "WebSearch",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(pip install:*)"
     ]
   }
 }
