@@ -167,6 +167,27 @@ def list_files():
     } for f in files[:50]])
 
 
+@app.route("/convert-clipboard", methods=["POST"])
+def convert_clipboard():
+    from converters.html import _html_to_md_with_tables
+    data = request.json or {}
+    kind = data.get("type", "text")   # "html" | "text"
+    content = data.get("content", "")
+
+    if not content.strip():
+        return jsonify({"error": "El portapapeles está vacío"}), 400
+
+    stem = f"clipboard_{int(time.time())}"
+    try:
+        md = _html_to_md_with_tables(content) if kind == "html" else content
+        fname = f"{stem}.md"
+        dest = OUTPUT_DIR / fname
+        dest.write_text(md, encoding="utf-8")
+        return jsonify([{"name": fname, "path": str(dest), "ok": True}])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # ─── UI ───────────────────────────────────────────────────────────────────────
 
 HTML = r"""<!DOCTYPE html>
@@ -658,6 +679,36 @@ HTML = r"""<!DOCTYPE html>
   }
 
 
+  /* Clipboard paste button */
+  .btn-clipboard {
+    width: 100%;
+    background: rgba(139,233,253,0.05);
+    border: 1px dashed rgba(139,233,253,0.28);
+    color: var(--accent2);
+    padding: 10px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.15s;
+    text-align: center;
+  }
+  .btn-clipboard:hover:not(:disabled) {
+    background: rgba(139,233,253,0.11);
+    border-color: var(--accent2);
+  }
+  .btn-clipboard:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn-clipboard.pasting {
+    border-color: var(--accent2);
+    background: rgba(139,233,253,0.09);
+    animation: clipPulse 0.9s ease-in-out infinite;
+  }
+  @keyframes clipPulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.55; }
+  }
+
   /* Scrollbar */
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -857,6 +908,11 @@ HTML = r"""<!DOCTYPE html>
     <input type="file" id="file-input" multiple
       accept=".docx,.pdf,.pptx,.html,.htm,.xlsx,.csv,.eml,.msg,.epub,.json,.xml,.zip">
 
+    <!-- Clipboard paste -->
+    <button class="btn-clipboard" id="btn-clipboard" onclick="pasteFromClipboard()">
+      ⎘ Pegar desde portapapeles — texto, HTML o imagen
+    </button>
+
     <!-- Conversiones (lista unificada: en curso + historial) -->
     <div class="section-title">Conversiones</div>
     <div class="filter-wrap">
@@ -939,6 +995,83 @@ fileInput.addEventListener('change', () => {
   if (fileInput.files.length) uploadFiles([...fileInput.files]);
   fileInput.value = '';
 });
+
+// ── Clipboard paste ──────────────────────────────────────────────────────────
+
+async function pasteFromClipboard() {
+  const btn = document.getElementById('btn-clipboard');
+  btn.disabled = true;
+  btn.classList.add('pasting');
+  const label = btn.textContent;
+  btn.textContent = '⌛ Leyendo portapapeles...';
+
+  try {
+    // Modern API: supports images + rich text
+    if (navigator.clipboard && navigator.clipboard.read) {
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        // Image (screenshot, copy from image viewer, etc.)
+        const imgType = item.types.find(t => t.startsWith('image/'));
+        if (imgType) {
+          const blob = await item.getType(imgType);
+          const ext  = imgType === 'image/jpeg' ? '.jpg' : '.png';
+          const file = new File([blob], 'clipboard' + ext, { type: imgType });
+          await uploadFiles([file]);
+          return;
+        }
+        // Rich text (HTML) — from browser, Word, email clients, etc.
+        if (item.types.includes('text/html')) {
+          const blob = await item.getType('text/html');
+          await _sendClipboardText('html', await blob.text());
+          return;
+        }
+        // Plain text fallback
+        if (item.types.includes('text/plain')) {
+          const blob = await item.getType('text/plain');
+          await _sendClipboardText('text', await blob.text());
+          return;
+        }
+      }
+    }
+
+    // Legacy fallback: readText only
+    const text = await navigator.clipboard.readText();
+    if (text.trim()) await _sendClipboardText('text', text);
+
+  } catch (e) {
+    const msg = e.name === 'NotAllowedError'
+      ? 'Permiso denegado — permite el acceso al portapapeles en el navegador'
+      : 'Error al leer portapapeles: ' + e.message;
+    errorItems.unshift({ name: 'portapapeles', error: msg });
+    renderConversions();
+  } finally {
+    btn.textContent = label;
+    btn.classList.remove('pasting');
+    btn.disabled = false;
+  }
+}
+
+async function _sendClipboardText(type, content) {
+  if (!content.trim()) {
+    errorItems.unshift({ name: 'portapapeles', error: 'El portapapeles está vacío' });
+    renderConversions();
+    return;
+  }
+  const resp = await fetch('/convert-clipboard', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type, content })
+  });
+  const data = await resp.json();
+  if (data.error) {
+    errorItems.unshift({ name: 'portapapeles', error: data.error });
+  } else {
+    for (const r of data) {
+      if (!r.ok) errorItems.unshift({ name: r.name, error: r.error || 'Error' });
+    }
+  }
+  await refreshConversions();
+}
 
 // ── Upload & Convert ─────────────────────────────────────────────────────────
 
