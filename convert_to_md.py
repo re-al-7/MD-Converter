@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 convert_to_md.py — Conversor universal a Markdown
-Soporta: .docx, .pdf, .pptx, .html, .htm, .xlsx, .csv, .eml, .msg, .epub, .json, .xml, .zip, URLs web
+
+Soporta: .docx, .pdf, .pptx, .html, .htm, .xlsx, .csv, .eml, .msg, .epub, .json, .xml, .zip, imágenes, URLs web
 
 Uso:
     python convert_to_md.py archivo.docx
@@ -10,6 +11,7 @@ Uso:
     python convert_to_md.py datos.xlsx
     python convert_to_md.py pagina.html
     python convert_to_md.py correo.eml
+    python convert_to_md.py imagen.png
     python convert_to_md.py libro.epub
     python convert_to_md.py datos.json
     python convert_to_md.py https://ejemplo.com
@@ -30,11 +32,13 @@ from converters import (
     convert_pptx,
     convert_eml,
     convert_msg,
+    convert_image,
+    IMAGE_EXTENSIONS,
     convert_with_markitdown,
     MARKITDOWN_EXTENSIONS,
 )
 
-SUPPORTED_EXTENSIONS = {".docx", ".pdf", ".pptx", ".html", ".htm", ".xlsx", ".csv", ".eml", ".msg"} | MARKITDOWN_EXTENSIONS
+SUPPORTED_EXTENSIONS = {".docx", ".pdf", ".pptx", ".html", ".htm", ".xlsx", ".csv", ".eml", ".msg"} | MARKITDOWN_EXTENSIONS | IMAGE_EXTENSIONS
 
 
 def install_deps():
@@ -51,6 +55,9 @@ def install_deps():
         "requests",       # fetch URL
         "beautifulsoup4", # parseo HTML
         "extract-msg",    # .msg Outlook → datos estructurados
+        "pytesseract",    # OCR imágenes (requiere Tesseract instalado)
+        "Pillow",         # carga de imágenes
+        "img2table",      # detección de tablas en imágenes (opcional)
         "markitdown[all]", # epub, json, xml, zip y más
     ]
     print("📦 Instalando dependencias...")
@@ -95,6 +102,8 @@ def convert_file(source: str, output_dir: Path = None) -> Path | None:
             content = convert_xlsx(Path(source))
         elif ext == ".csv":
             content = convert_csv(Path(source))
+        elif ext in IMAGE_EXTENSIONS:
+            content = convert_image(Path(source))
         elif ext in (".eml", ".msg"):
             fn           = convert_eml if ext == ".eml" else convert_msg
             mail_results = fn(Path(source))

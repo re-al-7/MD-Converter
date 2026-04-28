@@ -32,8 +32,14 @@ mdconverter/
 **Requisitos:** Python 3.10 o superior.
 
 ```powershell
-pip install flask mammoth pdfplumber html2text pandas openpyxl tabulate requests beautifulsoup4 extract-msg
+pip install flask mammoth pdfplumber html2text pandas openpyxl tabulate requests beautifulsoup4 extract-msg pytesseract Pillow img2table
 ```
+
+> **OCR de imágenes:** además del paquete `pytesseract`, necesitas instalar el binario de Tesseract:
+> ```powershell
+> winget install UB-Mannheim.TesseractOCR
+> ```
+> Para reconocimiento en español, selecciona el pack de idioma **Spanish** durante la instalación (o descárgalo desde la misma página). `img2table` es opcional pero mejora significativamente la detección de tablas.
 
 ---
 
@@ -84,6 +90,49 @@ python convert_to_md.py ./documentos/ -o ./markdown_output/
 | HTML / Web | `.html`, `.htm`, URL | Mantiene links e imágenes como referencias |
 | Email Outlook | `.msg` | Ver sección de correos abajo |
 | Email estándar | `.eml` | Ver sección de correos abajo |
+| Imagen | `.jpg`, `.jpeg`, `.png`, `.bmp`, `.tiff`, `.webp` | OCR con Tesseract — ver sección abajo |
+
+---
+
+## Conversión de imágenes (OCR)
+
+Convierte imágenes a Markdown extrayendo texto y tablas mediante OCR.
+
+### Formatos soportados
+
+`.jpg` · `.jpeg` · `.png` · `.bmp` · `.tiff` · `.tif` · `.webp`
+
+### Cómo funciona
+
+1. **Detección de tablas** — si `img2table` está instalado, detecta automáticamente regiones de tabla y las convierte a tablas Markdown. Las regiones de tabla se excluyen del paso siguiente.
+2. **Extracción de texto** — `pytesseract` aplica OCR al resto de la imagen. Usa español + inglés si el pack de idioma `spa` está disponible.
+3. **Salida** — texto primero, luego tablas separadas por `---`.
+
+### Ejemplo de salida
+
+```markdown
+Informe de ventas Q1 2026
+
+Los resultados del trimestre superaron las expectativas en un 12%...
+
+---
+
+| Región | Ventas | Variación |
+| --- | --- | --- |
+| Norte | 1.200.000 | +8% |
+| Sur | 980.000 | +15% |
+```
+
+### Requisitos
+
+| Componente | Instalación |
+|---|---|
+| `pytesseract` | `pip install pytesseract` |
+| `Pillow` | `pip install Pillow` |
+| Tesseract OCR (binario) | `winget install UB-Mannheim.TesseractOCR` |
+| `img2table` (opcional, tablas) | `pip install img2table` |
+
+> Si Tesseract no está en el PATH de Windows, agrégalo manualmente: `C:\Program Files\Tesseract-OCR`.
 
 ---
 
@@ -280,3 +329,6 @@ Los cambios tienen efecto inmediato — no es necesario reiniciar el servidor.
 | `pandas` + `openpyxl` + `tabulate` | Conversión `.xlsx` / `.csv` |
 | `requests` + `beautifulsoup4` | Descarga y parseo de URLs |
 | `extract-msg` | Lectura de archivos `.msg` de Outlook |
+| `pytesseract` | Wrapper de Python para Tesseract OCR |
+| `Pillow` | Carga y preprocesamiento de imágenes |
+| `img2table` *(opcional)* | Detección de tablas en imágenes |

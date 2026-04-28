@@ -20,7 +20,7 @@ from flask import Flask, request, jsonify, send_file, render_template_string
 SCRIPT_DIR = Path(__file__).parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from convert_to_md import convert_docx, convert_pdf, convert_html, convert_xlsx, convert_csv, convert_pptx, convert_eml, convert_msg, convert_with_markitdown, MARKITDOWN_EXTENSIONS
+from convert_to_md import convert_docx, convert_pdf, convert_html, convert_xlsx, convert_csv, convert_pptx, convert_eml, convert_msg, convert_with_markitdown, MARKITDOWN_EXTENSIONS, convert_image, IMAGE_EXTENSIONS
 
 app = Flask(__name__)
 OUTPUT_DIR = SCRIPT_DIR / "md_output"
@@ -63,7 +63,7 @@ def _start_watcher(folder_path: str) -> bool:
 
 # ─── Conversión ───────────────────────────────────────────────────────────────
 
-SUPPORTED = {".docx", ".pdf", ".pptx", ".html", ".htm", ".xlsx", ".csv", ".eml", ".msg"} | MARKITDOWN_EXTENSIONS
+SUPPORTED = {".docx", ".pdf", ".pptx", ".html", ".htm", ".xlsx", ".csv", ".eml", ".msg"} | MARKITDOWN_EXTENSIONS | IMAGE_EXTENSIONS
 
 def do_convert(src: Path, out_dir: Path) -> list[dict]:
     ext = src.suffix.lower()
@@ -83,6 +83,7 @@ def do_convert(src: Path, out_dir: Path) -> list[dict]:
             elif ext in (".html", ".htm"): content = convert_html(str(src))
             elif ext == ".xlsx":           content = convert_xlsx(src)
             elif ext == ".csv":            content = convert_csv(src)
+            elif ext in IMAGE_EXTENSIONS:  content = convert_image(src)
             elif ext in MARKITDOWN_EXTENSIONS: content = convert_with_markitdown(src)
             else:
                 return [{"name": src.name, "ok": False, "error": f"Formato no soportado: {ext}"}]
@@ -246,7 +247,7 @@ HTML = r"""<!DOCTYPE html>
 
   main {
     display: grid;
-    grid-template-columns: 1fr 320px;
+    grid-template-columns: 1fr 1fr 280px;
     gap: 0;
     position: relative; z-index: 1;
     height: calc(100vh - 61px);
@@ -333,12 +334,13 @@ HTML = r"""<!DOCTYPE html>
     letter-spacing: 0.05em;
   }
 
-  .ft-docx { background: rgba(139,233,253,0.12); color: var(--accent2); border: 1px solid rgba(139,233,253,0.25); }
-  .ft-pdf  { background: rgba(255,85,85,0.15);   color: var(--warn);    border: 1px solid rgba(255,85,85,0.25); }
-  .ft-xlsx { background: rgba(80,250,123,0.12);  color: var(--green);   border: 1px solid rgba(80,250,123,0.2); }
-  .ft-html { background: rgba(255,184,108,0.12); color: var(--orange);  border: 1px solid rgba(255,184,108,0.2); }
-  .ft-eml  { background: rgba(255,121,198,0.12); color: var(--pink);    border: 1px solid rgba(255,121,198,0.25); }
-  .ft-csv  { background: rgba(189,147,249,0.12); color: var(--accent);  border: 1px solid rgba(189,147,249,0.2); }
+  .ft-docx { background: rgba(0,102,255,0.15); color: #4d9fff; border: 1px solid rgba(0,102,255,0.25); }
+  .ft-pdf  { background: rgba(255,77,109,0.15); color: #ff6b8a; border: 1px solid rgba(255,77,109,0.25); }
+  .ft-xlsx { background: rgba(0,229,160,0.12); color: var(--accent); border: 1px solid rgba(0,229,160,0.2); }
+  .ft-html { background: rgba(255,165,0,0.12); color: #ffb347; border: 1px solid rgba(255,165,0,0.2); }
+  .ft-eml  { background: rgba(160,100,255,0.15); color: #c084fc; border: 1px solid rgba(160,100,255,0.25); }
+  .ft-csv  { background: rgba(100,200,255,0.12); color: #67e3ff; border: 1px solid rgba(100,200,255,0.2); }
+  .ft-img  { background: rgba(255,200,50,0.12); color: #fcd34d; border: 1px solid rgba(255,200,50,0.25); }
   .ft-epub { background: rgba(255,184,108,0.10); color: var(--orange);  border: 1px solid rgba(255,184,108,0.2); }
   .ft-json { background: rgba(80,250,123,0.10);  color: var(--green);   border: 1px solid rgba(80,250,123,0.18); }
   .ft-xml  { background: rgba(139,233,253,0.08); color: var(--accent2); border: 1px solid rgba(139,233,253,0.18); }
@@ -655,6 +657,113 @@ HTML = r"""<!DOCTYPE html>
     color: var(--accent);
   }
 
+  /* ── CENTER PANEL (Preview) ── */
+  .center {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 61px);
+    border-right: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .preview-empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .preview-empty-icon {
+    font-size: 36px;
+    opacity: 0.2;
+    line-height: 1;
+  }
+
+  .preview-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .preview-header {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+    background: var(--surface);
+  }
+
+  .preview-label {
+    font-family: var(--display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+
+  .preview-filename {
+    flex: 1;
+    font-size: 11px;
+    color: var(--accent);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .btn-copy {
+    background: rgba(0,229,160,0.08);
+    border: 1px solid rgba(0,229,160,0.2);
+    color: var(--accent);
+    padding: 4px 11px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+    transition: all 0.15s;
+    flex-shrink: 0;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .btn-copy:hover {
+    background: rgba(0,229,160,0.18);
+    border-color: var(--accent);
+  }
+
+  .btn-copy.copied {
+    background: rgba(0,229,160,0.25);
+    border-color: var(--accent);
+  }
+
+  .preview-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 24px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.75;
+    color: var(--text);
+    background: var(--bg);
+    margin: 0;
+    border: none;
+    outline: none;
+  }
+
   /* Scrollbar */
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -819,8 +928,8 @@ HTML = r"""<!DOCTYPE html>
 
 <header>
   <div class="logo">MD<span>Convert</span></div>
-  <div class="badge">local · localhost:5000</div>
-  <div class="badge" style="margin-left:auto">v2.3 · .docx .pdf .pptx .xlsx .html .csv .eml .msg .epub .json .xml .zip</div>
+  <div class="badge">local · localhost:5000</div>  
+  <div class="badge" style="margin-left:auto">v2.3 · .docx .pdf .pptx .xlsx .html .csv .eml .msg .epub .json .xml .zip .png .jpg…</div>
 </header>
 
 <main>
@@ -844,6 +953,11 @@ HTML = r"""<!DOCTYPE html>
         <span class="ft ft-eml">EML</span>
         <span class="ft ft-eml">MSG</span>
         <span class="ft ft-csv">CSV</span>
+        <span class="ft ft-img">IMG</span>
+      </div>
+    </div>
+    <input type="file" id="file-input" multiple
+      accept=".docx,.pdf,.html,.htm,.xlsx,.csv,.eml,.msg,.jpg,.jpeg,.png,.bmp,.tiff,.tif,.webp">
         <span class="ft ft-epub">EPUB</span>
         <span class="ft ft-json">JSON</span>
         <span class="ft ft-xml">XML</span>
@@ -861,6 +975,27 @@ HTML = r"""<!DOCTYPE html>
     </div>
     <div class="results-list" id="conversions-list">
       <div class="empty-state">Sin archivos aún</div>
+    </div>
+
+  </div>
+
+  <!-- CENTER - Preview -->
+  <div class="center">
+
+    <div class="preview-empty" id="preview-empty">
+      <div class="preview-empty-icon">◈</div>
+      <span>Convierte un archivo para ver el preview</span>
+      <span style="font-size:11px;opacity:0.6">o haz clic en un archivo del historial</span>
+    </div>
+
+    <div class="preview-panel" id="preview-panel" style="display:none">
+      <div class="preview-header">
+        <span class="preview-label">Preview</span>
+        <span class="preview-filename" id="preview-filename"></span>
+        <button class="btn-copy" id="btn-copy" onclick="copyMd()">⎘ Copiar MD</button>
+        <a class="btn-copy" id="btn-preview-dl" href="#" download>↓ Descargar</a>
+      </div>
+      <pre class="preview-content" id="preview-content"></pre>
     </div>
 
   </div>
@@ -969,6 +1104,28 @@ async function refreshConversions() {
   renderConversions();
 }
 
+function addResult(r) {
+  const el = document.createElement('div');
+  el.className = `result-item ${r.ok ? 'ok' : 'err'}`;
+  if (r.ok) {
+    el.style.cursor = 'pointer';
+    el.innerHTML = `
+      <div class="result-icon">✓</div>
+      <div class="result-info">
+        <div class="result-name">${esc(r.name)}</div>
+        <div class="result-meta">Convertido correctamente</div>
+      </div>
+      <a class="btn-dl" href="/download/${encodeURIComponent(r.name)}" download>↓ Descargar</a>`;
+    el.addEventListener('click', e => {
+      if (!e.target.closest('.btn-dl')) loadPreview(r.name);
+    });
+    loadPreview(r.name);
+  } else {
+    el.innerHTML = `
+      <div class="result-icon">✗</div>
+      <div class="result-info">
+        <div class="result-name">${esc(r.name)}</div>
+        <div class="result-meta err-msg">${esc(r.error || 'Error desconocido')}</div>
 function renderConversions() {
   const listEl = document.getElementById('conversions-list');
   const q = (document.getElementById('conv-filter')?.value || '').toLowerCase();
@@ -1040,6 +1197,58 @@ async function copyFile(name, btn) {
   }
 }
 
+async function refreshHistory() {
+  const resp = await fetch('/files');
+  const files = await resp.json();
+  history.innerHTML = files.length === 0
+    ? '<div class="empty-state">Sin archivos aún</div>'
+    : files.map(f => `
+      <div class="hist-item" style="cursor:pointer" onclick="loadPreview('${esc(f.name).replace(/'/g,"\\'")}')">
+        <span class="hist-name" title="${esc(f.name)}">📄 ${esc(f.name)}</span>
+        <span class="hist-size">${f.size_kb} KB</span>
+        <a class="hist-dl" href="/download/${encodeURIComponent(f.name)}" download title="Descargar" onclick="event.stopPropagation()">⬇</a>
+      </div>`).join('');
+}
+
+// ── Preview ───────────────────────────────────────────────────────────────────
+
+async function loadPreview(filename) {
+  const resp = await fetch(`/preview/${encodeURIComponent(filename)}`);
+  if (!resp.ok) return;
+  const text = await resp.text();
+
+  document.getElementById('preview-filename').textContent = filename;
+  document.getElementById('preview-content').textContent = text;
+  document.getElementById('btn-preview-dl').href = `/download/${encodeURIComponent(filename)}`;
+  document.getElementById('btn-preview-dl').download = filename;
+  document.getElementById('btn-copy').textContent = '⎘ Copiar MD';
+  document.getElementById('btn-copy').classList.remove('copied');
+
+  document.getElementById('preview-empty').style.display = 'none';
+  document.getElementById('preview-panel').style.display = 'flex';
+}
+
+async function copyMd() {
+  const text = document.getElementById('preview-content').textContent;
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    ta.remove();
+  }
+  const btn = document.getElementById('btn-copy');
+  btn.textContent = '✓ Copiado';
+  btn.classList.add('copied');
+  setTimeout(() => { btn.textContent = '⎘ Copiar MD'; btn.classList.remove('copied'); }, 2000);
+}
+
+refreshHistory();
+setInterval(refreshHistory, 4000);
 // ── Preview modal ─────────────────────────────────────────────────────────────
 
 let _previewContent = '';
@@ -1186,6 +1395,14 @@ function esc(s) {
 </script>
 </body>
 </html>"""
+
+
+@app.route("/preview/<path:filename>")
+def preview(filename):
+    fp = OUTPUT_DIR / filename
+    if not fp.exists():
+        return "Archivo no encontrado", 404
+    return fp.read_text(encoding="utf-8"), 200, {"Content-Type": "text/plain; charset=utf-8"}
 
 
 @app.route("/watch/status")
