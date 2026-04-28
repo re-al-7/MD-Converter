@@ -20,6 +20,16 @@ def convert_image(path: Path) -> str:
     except ImportError:
         raise ImportError("Pillow no está instalado. Ejecuta: pip install Pillow")
 
+    try:
+        pytesseract.get_tesseract_version()
+    except pytesseract.TesseractNotFoundError:
+        raise RuntimeError(
+            "Tesseract OCR no está instalado.\n"
+            "Instálalo con:  winget install UB-Mannheim.TesseractOCR\n"
+            "Descarga:  https://github.com/UB-Mannheim/tesseract/wiki\n"
+            "Después reinicia el servidor."
+        )
+
     img = Image.open(path).convert("RGB")
     lang = _detect_available_lang(pytesseract)
 
