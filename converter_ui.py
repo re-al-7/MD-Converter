@@ -2,7 +2,7 @@
 """
 converter_ui.py — UI web local para el conversor a Markdown
 Ejecutar: python converter_ui.py
-Luego abrir: http://localhost:5000
+Luego abrir: http://localhost:3200
 """
 
 import os
@@ -873,7 +873,7 @@ HTML = r"""<!DOCTYPE html>
 
 <header>
   <div class="logo">MD<span>Convert</span></div>
-  <div class="badge">local · localhost:5000</div>  
+  <div class="badge">local · localhost:3200</div>  
   <div class="badge" style="margin-left:auto">v2.4 · .docx .pdf .pptx .xlsx .html .csv .eml .msg .epub .json .xml .zip .png .jpg…</div>
 </header>
 
@@ -1381,7 +1381,7 @@ def _clear_folder(folder: Path) -> int:
 
 if __name__ == "__main__":
     print("\n  MD Converter UI")
-    print(f"  → http://localhost:5000")
+    print(f"  → http://localhost:3200")
     print(f"  → Archivos convertidos en: {OUTPUT_DIR}")
     print("  → Ctrl+C para detener\n")
 
@@ -1397,5 +1397,5 @@ if __name__ == "__main__":
         print(f"  👁  Escuchando: {DEFAULT_WATCH_DIR}")
     else:
         print(f"  ⚠  No se pudo iniciar escucha en: {DEFAULT_WATCH_DIR}")
-    threading.Timer(1.2, lambda: webbrowser.open("http://localhost:5000")).start()
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    threading.Timer(1.2, lambda: webbrowser.open("http://localhost:3200")).start()
+    app.run(host="0.0.0.0", port=3200, debug=False)

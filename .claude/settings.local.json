@@ -8,7 +8,11 @@
       "WebFetch(domain:github.com)",
       "WebSearch",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Bash(npx claude-mem:*)",
+      "mcp__plugin_claude-mem_mcp-search__get_observations",
+      "Bash(sed -n '257,270p' /d/mdconverter/converter_ui.py)",
+      "Bash(sed -n '371,385p' /d/mdconverter/converter_ui.py)"
     ]
   }
 }

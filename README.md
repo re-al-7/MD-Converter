@@ -9,7 +9,7 @@ Conversor universal de archivos a Markdown, con UI web local y soporte especiali
 ```
 mdconverter/
 ├── convert_to_md.py           # CLI + dispatcher (re-exporta converters/)
-├── converter_ui.py            # Servidor Flask con UI drag & drop (localhost:5000)
+├── converter_ui.py            # Servidor Flask con UI drag & drop (localhost:3200)
 ├── contact_aliases.json       # Reglas de alias para contactos conocidos
 ├── converters/                # Lógica de conversión por formato
 │   ├── docx.py                #   .docx → Markdown (mammoth)
@@ -51,7 +51,7 @@ pip install flask mammoth pdfplumber html2text pandas openpyxl tabulate requests
 python converter_ui.py
 ```
 
-Se abre automáticamente el browser en `http://localhost:5000`. Para lanzarlo sin ventana de terminal, usa el archivo `iniciar.bat`:
+Se abre automáticamente el browser en `http://localhost:3200`. Para lanzarlo sin ventana de terminal, usa el archivo `iniciar.bat`:
 
 ```bat
 @echo off
@@ -236,7 +236,7 @@ Para que la aplicación arranque sola cada vez que inicies sesión en Windows, e
 python setup_startup.py install
 ```
 
-Esto agrega una entrada en `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` (sin necesidad de permisos de administrador). A partir del próximo inicio de sesión, la app arrancará en segundo plano y abrirá `http://localhost:5000` en el navegador.
+Esto agrega una entrada en `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` (sin necesidad de permisos de administrador). A partir del próximo inicio de sesión, la app arrancará en segundo plano y abrirá `http://localhost:3200` en el navegador.
 
 ### Otros comandos
 

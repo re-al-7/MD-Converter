@@ -54,7 +54,7 @@ def install():
         print(f"     Comando registrado: {command}")
         print()
         print("La aplicacion se iniciara automaticamente la proxima vez que")
-        print("inicies sesion en Windows y abrira http://localhost:5000 en el navegador.")
+        print("inicies sesion en Windows y abrira http://localhost:3200 en el navegador.")
     except PermissionError:
         print("ERROR: Sin permisos para escribir en el registro.")
         print("Intenta ejecutar este script como administrador.")
