@@ -170,10 +170,10 @@ def _seg_stem(seg_date, fallback_date_raw, subject_slug: str) -> str:
     from datetime import datetime
 
     if seg_date and isinstance(seg_date, datetime):
-        return f"{seg_date.strftime('%Y-%m-%d')} — {subject_slug}"
+        return f"{seg_date.strftime('%Y-%m-%d-%H%M')} — {subject_slug}"
     try:
         if isinstance(fallback_date_raw, datetime):
-            return f"{fallback_date_raw.strftime('%Y-%m-%d')} — {subject_slug}"
-        return f"{parsedate_to_datetime(fallback_date_raw).strftime('%Y-%m-%d')} — {subject_slug}"
+            return f"{fallback_date_raw.strftime('%Y-%m-%d-%H%M')} — {subject_slug}"
+        return f"{parsedate_to_datetime(fallback_date_raw).strftime('%Y-%m-%d-%H%M')} — {subject_slug}"
     except Exception:
-        return f"0000-00-00 — {subject_slug}"
+        return f"0000-00-00-0000 — {subject_slug}"

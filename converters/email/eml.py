@@ -93,9 +93,9 @@ def convert_eml(path: Path) -> list[tuple[str, str]]:
     attachments = _extract_attachments(msg)
 
     try:
-        fecha_stem = parsedate_to_datetime(date_raw).strftime("%Y-%m-%d")
+        fecha_stem = parsedate_to_datetime(date_raw).strftime("%Y-%m-%d-%H%M")
     except Exception:
-        fecha_stem = "0000-00-00"
+        fecha_stem = "0000-00-00-0000"
 
     subject_slug = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '', subject)
     subject_slug = re.sub(r'\s+', ' ', subject_slug).strip()[:80]

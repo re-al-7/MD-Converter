@@ -38,10 +38,10 @@ def convert_msg(path: Path) -> list[tuple[str, str]]:
 
     # Fecha y stem base
     if date_obj:
-        fecha_stem = date_obj.strftime("%Y-%m-%d")
+        fecha_stem = date_obj.strftime("%Y-%m-%d-%H%M")
         date_raw   = date_obj
     else:
-        fecha_stem = "0000-00-00"
+        fecha_stem = "0000-00-00-0000"
         date_raw   = ""
 
     subject_slug = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '', subject)
