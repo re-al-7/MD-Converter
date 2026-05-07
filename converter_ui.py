@@ -23,6 +23,7 @@ sys.path.insert(0, str(SCRIPT_DIR))
 from convert_to_md import convert_docx, convert_pdf, convert_html, convert_xlsx, convert_csv, convert_pptx, convert_eml, convert_msg, convert_with_markitdown, MARKITDOWN_EXTENSIONS, convert_image, IMAGE_EXTENSIONS
 
 app = Flask(__name__)
+PORT = int(os.environ.get("PORT", 3200))
 OUTPUT_DIR = Path(os.environ.get("OUTPUT_DIR", str(SCRIPT_DIR / "md_output")))
 OUTPUT_DIR.mkdir(exist_ok=True)
 
@@ -873,7 +874,7 @@ HTML = r"""<!DOCTYPE html>
 
 <header>
   <div class="logo">MD<span>Convert</span></div>
-  <div class="badge">local · localhost:3200</div>  
+  <div class="badge">local · localhost:{{ port }}</div>
   <div class="badge" style="margin-left:auto">v2.4 · .docx .pdf .pptx .xlsx .html .csv .eml .msg .epub .json .xml .zip .png .jpg…</div>
 </header>
 
@@ -1363,7 +1364,7 @@ def open_folder():
 
 @app.route("/")
 def index():
-    return render_template_string(HTML)
+    return render_template_string(HTML, port=PORT)
 
 
 # ─── Arranque ─────────────────────────────────────────────────────────────────
@@ -1381,7 +1382,7 @@ def _clear_folder(folder: Path) -> int:
 
 if __name__ == "__main__":
     print("\n  MD Converter UI")
-    print(f"  → http://localhost:3200")
+    print(f"  → http://localhost:{PORT}")
     print(f"  → Archivos convertidos en: {OUTPUT_DIR}")
     print("  → Ctrl+C para detener\n")
 
@@ -1397,5 +1398,5 @@ if __name__ == "__main__":
         print(f"  👁  Escuchando: {DEFAULT_WATCH_DIR}")
     else:
         print(f"  ⚠  No se pudo iniciar escucha en: {DEFAULT_WATCH_DIR}")
-    threading.Timer(1.2, lambda: webbrowser.open("http://localhost:3200")).start()
-    app.run(host="0.0.0.0", port=3200, debug=False)
+    threading.Timer(1.2, lambda: webbrowser.open(f"http://localhost:{PORT}")).start()
+    app.run(host="0.0.0.0", port=PORT, debug=False)
