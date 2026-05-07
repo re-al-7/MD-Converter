@@ -26,7 +26,7 @@ app = Flask(__name__)
 OUTPUT_DIR = SCRIPT_DIR / "md_output"
 OUTPUT_DIR.mkdir(exist_ok=True)
 
-DEFAULT_WATCH_DIR = r"D:\mdconverter\correos"
+DEFAULT_WATCH_DIR = os.environ.get("WATCH_DIR", r"D:\mdconverter\correos")
 WATCH_DIR = None
 WATCH_THREAD = None
 WATCH_ACTIVE = False
