@@ -11,8 +11,9 @@ def _parse_date_spanish(text: str):
     """
     Parsea fechas en formatos que aparecen en correos Outlook/Gmail:
       - "Thu, Apr 2, 2026 at 6:24 PM"        (Gmail On...wrote)
+      - "6 May 2026, at 9:54 AM"              (On...wrote estilo Apple/Outlook)
       - "jueves, 2 de abril de 2026 8:18"     (Outlook Enviado español)
-    Retorna datetime o None.
+    Retorna datetime o None (con hora si está disponible).
     """
     from datetime import datetime
 
@@ -26,36 +27,53 @@ def _parse_date_spanish(text: str):
         'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12,
     }
 
-    # Español: "2 de abril de 2026"
+    def _extract_time(text_after: str) -> tuple[int, int]:
+        """Extrae (hora, minuto) de 'at H:MM AM/PM' o 'H:MM' al inicio del texto restante."""
+        # "at 9:54 AM" o "at 9:54 AM" (narrow no-break space)
+        m = re.search(r'(?:,?\s*at\s+|,?\s+)(\d{1,2}):(\d{2})[\s ]*(AM|PM|am|pm)?', text_after)
+        if m:
+            h, mn = int(m.group(1)), int(m.group(2))
+            ampm = (m.group(3) or '').upper()
+            if ampm == 'PM' and h != 12:
+                h += 12
+            elif ampm == 'AM' and h == 12:
+                h = 0
+            return h, mn
+        return 0, 0
+
+    # Español: "2 de abril de 2026" opcionalmente seguido de " 8:18"
     m = re.search(r'\b(\d{1,2})\s+de\s+(\w+)\s+de\s+(\d{4})', text, re.IGNORECASE)
     if m:
         day, month_str, year = int(m.group(1)), m.group(2).lower(), int(m.group(3))
         month = MONTHS_ES.get(month_str)
         if month:
             try:
-                return datetime(year, month, day)
+                h, mn = _extract_time(text[m.end():])
+                return datetime(year, month, day, h, mn)
             except Exception:
                 pass
 
-    # Inglés: "Apr 2, 2026"
+    # Inglés: "Apr 2, 2026" opcionalmente seguido de " at 6:24 PM"
     m = re.search(r'\b([A-Za-z]{3,9})\s+(\d{1,2}),?\s+(\d{4})', text, re.IGNORECASE)
     if m:
         month_str, day, year = m.group(1).lower()[:3], int(m.group(2)), int(m.group(3))
         month = MONTHS_EN.get(month_str)
         if month:
             try:
-                return datetime(year, month, day)
+                h, mn = _extract_time(text[m.end():])
+                return datetime(year, month, day, h, mn)
             except Exception:
                 pass
 
-    # Inglés: "2 Apr 2026"
+    # Inglés: "2 Apr 2026" opcionalmente seguido de " at 6:24 PM"
     m = re.search(r'\b(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{4})', text, re.IGNORECASE)
     if m:
         day, month_str, year = int(m.group(1)), m.group(2).lower()[:3], int(m.group(3))
         month = MONTHS_EN.get(month_str)
         if month:
             try:
-                return datetime(year, month, day)
+                h, mn = _extract_time(text[m.end():])
+                return datetime(year, month, day, h, mn)
             except Exception:
                 pass
 
