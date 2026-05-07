@@ -23,7 +23,7 @@ sys.path.insert(0, str(SCRIPT_DIR))
 from convert_to_md import convert_docx, convert_pdf, convert_html, convert_xlsx, convert_csv, convert_pptx, convert_eml, convert_msg, convert_with_markitdown, MARKITDOWN_EXTENSIONS, convert_image, IMAGE_EXTENSIONS
 
 app = Flask(__name__)
-OUTPUT_DIR = SCRIPT_DIR / "md_output"
+OUTPUT_DIR = Path(os.environ.get("OUTPUT_DIR", str(SCRIPT_DIR / "md_output")))
 OUTPUT_DIR.mkdir(exist_ok=True)
 
 DEFAULT_WATCH_DIR = os.environ.get("WATCH_DIR", r"D:\mdconverter\correos")

@@ -8,4 +8,5 @@ services:
       - ./md_output:/app/md_output
     environment:
       - WATCH_DIR=/app/correos
+      - OUTPUT_DIR=/app/md_output
     restart: unless-stopped

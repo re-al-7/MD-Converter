@@ -17,6 +17,7 @@ COPY . .
 RUN mkdir -p /app/correos /app/md_output
 
 ENV WATCH_DIR=/app/correos
+ENV OUTPUT_DIR=/app/md_output
 
 EXPOSE 3200
 
