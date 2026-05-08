@@ -1,0 +1,13 @@
+services:
+  md-converter:
+    build: .
+    ports:
+      - "${PORT:-3200}:${PORT:-3200}"
+    volumes:
+      - ./correos:/app/correos
+      - ./md_output:/app/md_output
+    environment:
+      - WATCH_DIR=/app/correos
+      - OUTPUT_DIR=/app/md_output
+      - PORT=${PORT:-3200}
+    restart: unless-stopped

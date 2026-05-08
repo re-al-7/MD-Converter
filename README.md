@@ -43,6 +43,86 @@ pip install flask mammoth pdfplumber html2text pandas openpyxl tabulate requests
 
 ---
 
+## Docker
+
+### Inicio rápido
+
+```bash
+docker compose up --build
+```
+
+Abre `http://localhost:3200` en el navegador. Los archivos de entrada y salida se montan como volúmenes locales:
+
+| Carpeta local | Ruta en el contenedor | Descripción |
+|---|---|---|
+| `./correos/` | `/app/correos` | Archivos a convertir (carpeta vigilada) |
+| `./md_output/` | `/app/md_output` | Archivos `.md` generados |
+
+### Variables de entorno
+
+| Variable | Valor por defecto | Descripción |
+|---|---|---|
+| `PORT` | `3200` | Puerto en el que escucha la UI |
+| `WATCH_DIR` | `/app/correos` | Carpeta vigilada para conversión automática |
+| `OUTPUT_DIR` | `/app/md_output` | Carpeta de salida de los `.md` generados |
+
+Ejemplo cambiando el puerto:
+
+```bash
+PORT=8080 docker compose up --build
+```
+
+---
+
+### Publicar en DockerHub
+
+**1. Construir la imagen con tu usuario de DockerHub:**
+
+```bash
+docker build -t tuusuario/md-converter:latest .
+```
+
+**2. Iniciar sesión:**
+
+```bash
+docker login
+```
+
+**3. Subir la imagen:**
+
+```bash
+docker push tuusuario/md-converter:latest
+```
+
+**4. (Opcional) Etiquetar también con versión:**
+
+```bash
+docker tag tuusuario/md-converter:latest tuusuario/md-converter:1.0.0
+docker push tuusuario/md-converter:1.0.0
+```
+
+---
+
+### Actualizar la imagen tras cambios en el código
+
+**1. Reconstruir y publicar:**
+
+```bash
+docker build -t tuusuario/md-converter:latest .
+docker push tuusuario/md-converter:latest
+```
+
+**2. En el servidor, bajar la nueva imagen y reiniciar:**
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+> `docker compose pull` descarga la imagen actualizada desde DockerHub sin detener el servicio. `up -d` recrea el contenedor solo si la imagen cambió.
+
+---
+
 ## Uso
 
 ### UI web (recomendado)
