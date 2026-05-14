@@ -1,0 +1,15 @@
+flask
+mammoth
+pdfplumber
+python-pptx
+html2text
+pandas
+openpyxl
+tabulate
+requests
+beautifulsoup4
+extract-msg
+pytesseract
+Pillow
+img2table
+markitdown[all]
