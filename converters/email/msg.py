@@ -7,7 +7,7 @@ from pathlib import Path
 
 from ..html import _html_to_md_with_tables
 from .thread import _split_thread
-from .builders import _build_md, _seg_stem, _decode_bytes
+from .builders import _build_md, _seg_stem, _decode_bytes, _find_template
 
 
 def convert_msg(path: Path) -> list[tuple[str, str]]:
@@ -58,9 +58,12 @@ def convert_msg(path: Path) -> list[tuple[str, str]]:
 
     if not segments:
         # Mensaje único: usar HTML body para conservar tablas
-        body    = html_md if html_md else plain_body
-        content = _build_md(subject, sender, to, cc, date_raw, body, att_names)
-        return [(f"{base_stem}.md", content)]
+        body     = html_md if html_md else plain_body
+        tmpl     = _find_template(sender, to, cc, subject)
+        fmt      = tmpl.get("filename_format", "{date} — {subject}")
+        stem     = fmt.replace("{date}", fecha_stem).replace("{subject}", subject_slug)
+        content  = _build_md(subject, sender, to, cc, date_raw, body, att_names, template=tmpl)
+        return [(f"{stem}.md", content)]
 
     # Hilo: intentar dividir también el HTML para obtener cuerpos con tablas.
     # La metadata siempre viene del split de texto plano (más fiable).
@@ -83,7 +86,8 @@ def convert_msg(path: Path) -> list[tuple[str, str]]:
         seg_subject = seg.get("subject") or subject
         seg_slug    = re.sub(r'[<>:"/\\|?*\x00-\x1f,;]', ' ', seg_subject)
         seg_slug    = re.sub(r' {2,}', ' ', seg_slug).strip()[:80]
-        stem        = _seg_stem(seg_date, date_raw, seg_slug)
+        tmpl        = _find_template(seg_sender, seg_to, seg_cc, seg_subject)
+        stem        = _seg_stem(seg_date, date_raw, seg_slug, tmpl.get("filename_format", "{date} — {subject}"))
         filename    = f"{stem} — msg{i:02d} de {total}.md"
         seg_body    = html_body_seg if html_body_seg else seg["body"]
         content     = _build_md(
@@ -92,6 +96,7 @@ def convert_msg(path: Path) -> list[tuple[str, str]]:
             seg_body,
             att_names if i == total else [],
             index=i, total=total,
+            template=tmpl,
         )
         results.append((filename, content))
 

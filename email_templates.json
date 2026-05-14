@@ -1,0 +1,44 @@
+{
+  "_doc": "Templates para correos .eml y .msg. Se evalúan en orden — el primero que hace match se usa. El template 'default' (match vacío) debe ir al final. Campos de match soportados: from_contains, to_contains, cc_contains, subject_contains (todos case-insensitive, condición AND). Campos de frontmatter: strings para campos computados (fecha, de, para, cc, asunto, direccion, adjuntos) u objetos {\"name\": \"campo\", \"value\": valor} para campos fijos. Soporta body_header, body_footer (con placeholders {fecha}, {subject}, {de}), body_quote (boolean).",
+  "templates": [
+    {
+      "name": "ticket-soporte-it",
+      "match": {
+        "from_contains": "alonzo vera",
+        "to_contains": "soporte.it@nuevatel.com"
+      },
+      "frontmatter": [
+        { "name": "tkt", "value": "SPNT-XXX" },
+        "fecha",
+        { "name": "producto", "value": "AdExchange | SHOP | NewsFeed | Transversal" },
+        { "name": "estado", "value": "creado" },
+        "asunto",
+        "de",
+        { "name": "responsable", "value": "[[Alonzo Vera]]" },
+        { "name": "proyecto_relacionado", "value": null },
+        { "name": "tags", "value": ["soporte", "ticket"] }
+      ],
+      "body_header": "## Datos del ticket\n\n| Campo | Valor |\n|-------|-------|\n| Fecha de recepción | {fecha} |\n| Producto | |\n| Proyecto relacionado | |\n| Solicitante | {de} |\n| Responsable asignado | [[Alonzo Vera]] |\n| Estado | 🔵 Creado |\n\n## Solicitud original",
+      "body_quote": true,
+      "body_footer": "## Derivación\n\n**Derivado a:** [[Nombre Apellido]]\n**Fecha de derivación:** {fecha}\n**Canal:** Correo / Teams / HeliosHub\n\n## Resolución\n\n**Fecha de cierre:** —\n**Resumen de la resolución:** —\n\n## Historial\n\n| Fecha | Acción | Responsable |\n|-------|--------|-------------|\n| {fecha} | Ticket creado | [[Alonzo Vera]] |",
+      "filename_format": "{date} — {subject}"
+    },
+    {
+      "name": "default",
+      "match": {},
+      "frontmatter": [
+        "fecha",
+        "de",
+        "para",
+        "cc",
+        "asunto",
+        { "name": "tipo", "value": "correo" },
+        "direccion",
+        { "name": "tags", "value": ["correo"] },
+        "adjuntos"
+      ],
+      "body_header": "## Contenido",
+      "filename_format": "{date} — {subject}"
+    }
+  ]
+}

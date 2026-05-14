@@ -1,7 +1,7 @@
 """
 Construcción de Markdown y YAML frontmatter para correos.
 
-Exporta: _build_md, _seg_stem  (y helpers internos usados por ambos)
+Exporta: _build_md, _seg_stem, _find_template  (y helpers internos usados por ambos)
 """
 
 import re
@@ -17,7 +17,7 @@ _PROJECT_ROOT = Path(__file__).parent.parent.parent
 def _decode_bytes(data: bytes, hint_charset: str = None) -> str:
     """
     Decodifica bytes probando el charset sugerido y luego fallbacks comunes.
-    Evita caracteres de reemplazo (\ufffd) que aparecen cuando el charset
+    Evita caracteres de reemplazo (�) que aparecen cuando el charset
     declarado no coincide con el encoding real del contenido.
     """
     candidates = []
@@ -28,8 +28,7 @@ def _decode_bytes(data: bytes, hint_charset: str = None) -> str:
     for enc in candidates:
         try:
             text = data.decode(enc)
-            # Rechazar si hay demasiados caracteres de reemplazo
-            if text.count('\ufffd') / max(len(text), 1) < 0.01:
+            if text.count('�') / max(len(text), 1) < 0.01:
                 return text
         except (UnicodeDecodeError, LookupError):
             continue
@@ -92,13 +91,122 @@ def _apply_alias(address: str, aliases: list[dict]) -> str:
     return address
 
 
+# ─── Sistema de templates ─────────────────────────────────────────────────────
+
+_DEFAULT_TEMPLATE = {
+    "name": "default",
+    "match": {},
+    "frontmatter": [
+        "fecha",
+        "de",
+        "para",
+        "cc",
+        "asunto",
+        {"name": "tipo", "value": "correo"},
+        "direccion",
+        {"name": "tags", "value": ["correo"]},
+        "adjuntos",
+    ],
+    "body_header": "## Contenido",
+    "filename_format": "{date} — {subject}",
+}
+
+
+def _load_templates() -> list[dict]:
+    """Carga templates desde email_templates.json en la raíz del proyecto."""
+    templates_path = _PROJECT_ROOT / "email_templates.json"
+    if not templates_path.exists():
+        return []
+    try:
+        with open(templates_path, encoding="utf-8") as f:
+            return json.load(f).get("templates", [])
+    except Exception:
+        return []
+
+
+def _find_template(sender: str, to: str, cc: str, subject: str) -> dict:
+    """Retorna el primer template que hace match con los metadatos del correo, o el default."""
+    templates = _load_templates()
+    sender_l  = (sender  or "").lower()
+    to_l      = (to      or "").lower()
+    cc_l      = (cc      or "").lower()
+    subject_l = (subject or "").lower()
+
+    for tmpl in templates:
+        match = tmpl.get("match", {})
+        if match.get("from_contains")    and match["from_contains"].lower()    not in sender_l:  continue
+        if match.get("to_contains")      and match["to_contains"].lower()      not in to_l:      continue
+        if match.get("cc_contains")      and match["cc_contains"].lower()      not in cc_l:      continue
+        if match.get("subject_contains") and match["subject_contains"].lower() not in subject_l: continue
+        return tmpl
+
+    return _DEFAULT_TEMPLATE
+
+
+def _render_computed_field(name: str, ctx: dict) -> list[str]:
+    """Renderiza un campo computado del frontmatter como lista de líneas YAML."""
+    if name == "fecha":
+        return [f"fecha: {ctx['fecha']}"]
+    if name == "de":
+        return [f"de: {ctx['sender_out']}"]
+    if name == "para":
+        lines = ["para:"]
+        for addr in (ctx["to_list"] or [ctx["to_raw"]]):
+            lines.append(f"  - {addr}")
+        return lines
+    if name == "cc":
+        lines = ["cc:"]
+        for addr in ctx["cc_list"]:
+            lines.append(f"  - {addr}")
+        return lines
+    if name == "asunto":
+        return [f"asunto: {ctx['subject_clean']}"]
+    if name == "direccion":
+        return [f"direccion: {ctx['direction']}"]
+    if name == "adjuntos":
+        lines = ["adjuntos:"]
+        for n in ctx["att_names"]:
+            lines.append(f"  - {n}")
+        return lines
+    return []
+
+
+def _yaml_scalar(value: str) -> str:
+    """Envuelve en comillas dobles strings que contienen caracteres especiales YAML."""
+    if any(c in value for c in ('[[', ']]', ':', '#', '*', '&', '!', '{', '}')):
+        return f'"{value.replace(chr(34), chr(92) + chr(34))}"'
+    return value
+
+
+def _render_fm_field(field, ctx: dict) -> list[str]:
+    """Renderiza un ítem del frontmatter del template (string o dict) como líneas YAML."""
+    if isinstance(field, str):
+        return _render_computed_field(field, ctx)
+    # Fixed: {"name": "tipo", "value": "correo"} o {"name": "tags", "value": ["correo"]}
+    name  = field.get("name", "")
+    value = field.get("value")
+    if isinstance(value, list):
+        lines = [f"{name}:"]
+        for v in value:
+            lines.append(f"  - {_yaml_scalar(str(v)) if isinstance(v, str) else v}")
+        return lines
+    elif value is None:
+        return [f"{name}:"]
+    else:
+        return [f"{name}: {_yaml_scalar(str(value))}"]
+
+
 # ─── Construcción de Markdown ─────────────────────────────────────────────────
 
 def _build_md(subject: str, sender: str, to: str, cc: str,
               date_raw_dt, body: str, attachments: list[str],
-              index: int = None, total: int = None) -> str:
-    """Construye el Markdown con YAML frontmatter según el formato estándar."""
+              index: int = None, total: int = None,
+              template: dict = None) -> str:
+    """Construye el Markdown con YAML frontmatter según el template activo."""
     from email.utils import parsedate_to_datetime
+
+    if template is None:
+        template = _find_template(sender, to, cc, subject)
 
     # Fecha en yyyy-MM-dd
     try:
@@ -109,10 +217,10 @@ def _build_md(subject: str, sender: str, to: str, cc: str,
     except Exception:
         fecha = str(date_raw_dt)
 
-    aliases   = _load_aliases()
-    to_list   = [_apply_alias(a, aliases) for a in _parse_addresses(to)]
-    cc_list   = [_apply_alias(a, aliases) for a in _parse_addresses(cc)]
-    att_names = _attachment_names(attachments)
+    aliases    = _load_aliases()
+    to_list    = [_apply_alias(a, aliases) for a in _parse_addresses(to)]
+    cc_list    = [_apply_alias(a, aliases) for a in _parse_addresses(cc)]
+    att_names  = _attachment_names(attachments)
     sender_out = _apply_alias(sender, aliases)
     direction  = _detect_direction(sender)
 
@@ -124,56 +232,62 @@ def _build_md(subject: str, sender: str, to: str, cc: str,
     if index is not None and total is not None and total > 1:
         title = f"{subject} [{index}/{total}]"
 
+    ctx = {
+        "fecha":         fecha,
+        "sender_out":    sender_out,
+        "to_list":       to_list,
+        "to_raw":        _apply_alias(to, aliases),
+        "cc_list":       cc_list,
+        "subject_clean": subject_clean,
+        "direction":     direction,
+        "att_names":     att_names,
+    }
+
     # ── YAML frontmatter ──────────────────────────────────────────────
-    fm = [
-        "---",
-        f"fecha: {fecha}",
-        f"de: {sender_out}",
-        "para:",
-    ]
-    for addr in (to_list or [_apply_alias(to, aliases)]):
-        fm.append(f"  - {addr}")
-
-    fm.append("cc:")
-    for addr in cc_list:
-        fm.append(f"  - {addr}")
-
-    fm += [
-        f"asunto: {subject_clean}",
-        "tipo: correo",
-        f"direccion: {direction}",
-        "tags:",
-        "  - correo",
-        "adjuntos:",
-    ]
-    for name in att_names:
-        fm.append(f"  - {name}")
-
+    fm = ["---"]
+    for field in template.get("frontmatter", _DEFAULT_TEMPLATE["frontmatter"]):
+        fm.extend(_render_fm_field(field, ctx))
     fm.append("---")
 
     # ── Cuerpo ────────────────────────────────────────────────────────
-    body_md = [
-        "",
-        f"# {title}",
-        "",
-        "## Contenido",
-        "",
-        body.strip() if body else "*(Sin contenido)*",
-    ]
+    placeholders = {"fecha": ctx["fecha"], "subject": ctx["subject_clean"], "de": ctx["sender_out"]}
+
+    body_header = template.get("body_header") or "## Contenido"
+    for k, v in placeholders.items():
+        body_header = body_header.replace(f"{{{k}}}", v)
+
+    body_footer = template.get("body_footer", "")
+    for k, v in placeholders.items():
+        body_footer = body_footer.replace(f"{{{k}}}", v)
+
+    if template.get("body_quote"):
+        lines = body.strip().splitlines() if body else []
+        body_text = "\n".join(f"> {line}" if line.strip() else ">" for line in lines) or "> *(Sin contenido)*"
+    else:
+        body_text = body.strip() if body else "*(Sin contenido)*"
+
+    body_md = ["", f"# {title}", "", body_header, "", body_text]
+    if body_footer:
+        body_md.extend(["", body_footer])
 
     return "\n".join(fm + body_md)
 
 
-def _seg_stem(seg_date, fallback_date_raw, subject_slug: str) -> str:
+def _seg_stem(seg_date, fallback_date_raw, subject_slug: str,
+              filename_format: str = "{date} — {subject}") -> str:
     """Genera el stem del nombre de archivo usando la fecha del segmento o fallback."""
     from email.utils import parsedate_to_datetime
     from datetime import datetime
 
     if seg_date and isinstance(seg_date, datetime):
-        return f"{seg_date.strftime('%Y-%m-%d-%H%M')} — {subject_slug}"
-    try:
-        if isinstance(fallback_date_raw, datetime):
-            return f"{fallback_date_raw.strftime('%Y-%m-%d-%H%M')} — {subject_slug}"
-        return f"{parsedate_to_datetime(fallback_date_raw).strftime('%Y-%m-%d-%H%M')} — {subject_slug}"
-    except Exception:
-        return f"0000-00-00-0000 — {subject_slug}"
+        date_str = seg_date.strftime('%Y-%m-%d-%H%M')
+    else:
+        try:
+            if isinstance(fallback_date_raw, datetime):
+                date_str = fallback_date_raw.strftime('%Y-%m-%d-%H%M')
+            else:
+                date_str = parsedate_to_datetime(fallback_date_raw).strftime('%Y-%m-%d-%H%M')
+        except Exception:
+            date_str = "0000-00-00-0000"
+
+    return filename_format.replace("{date}", date_str).replace("{subject}", subject_slug)
