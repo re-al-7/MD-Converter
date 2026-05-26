@@ -330,6 +330,42 @@ python setup_startup.py uninstall
 
 > **Nota:** Si usas un entorno virtual (`venv/`), el script lo detecta automáticamente. En caso contrario, usa el `pythonw.exe` del sistema.
 
+### Detener o reiniciar el servicio instalado
+
+Cuando la app corre en segundo plano (iniciada por `run_hidden.vbs` o por el arranque automático de Windows), **no hay ventana de consola** para cerrarla. El proceso se llama `pythonw.exe`. Para detenerlo:
+
+```powershell
+taskkill /F /IM pythonw.exe
+```
+
+| Parámetro | Significado |
+|---|---|
+| `/F` | Forzar terminación inmediata (equivale a "matar" el proceso) |
+| `/IM pythonw.exe` | Identificar el proceso por nombre de imagen |
+
+> **Precaución:** Si tienes otras aplicaciones Python corriendo en segundo plano bajo `pythonw.exe`, este comando las detendrá también. Para terminar solo el proceso de MD Converter usa `/PID` con el identificador exacto (ver abajo).
+
+**Para reiniciar** después de detener, ejecuta el script de inicio o abre `run_hidden.vbs` con doble clic:
+
+```powershell
+# Reinicio desde PowerShell
+Start-Process wscript "run_hidden.vbs"
+```
+
+**Para ver el PID exacto** del proceso antes de matarlo:
+
+```powershell
+Get-Process pythonw | Select-Object Id, Path
+# o en cmd:
+tasklist /FI "IMAGENAME eq pythonw.exe"
+```
+
+Una vez identificado el PID, termina solo ese proceso:
+
+```powershell
+taskkill /F /PID 1234
+```
+
 ---
 
 ## Carpetas por defecto
